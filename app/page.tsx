@@ -2,11 +2,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight, Check, ChevronDown, ChevronUp, Download, Eye, EyeOff, ImagePlus, Layers3, LockKeyhole, Redo2,
-  RefreshCw, RotateCcw, Sparkles, Undo2, Upload, WandSparkles, AlignLeft, AlignCenter, ExternalLink,
+  RefreshCw, RotateCcw, Sparkles, Shuffle, Lock, LockOpen, FlipHorizontal2, Copy, Trash2, ShieldCheck, X, ArrowRight, ArrowLeft as ArrowBack, Undo2, Upload, WandSparkles, AlignLeft, AlignCenter, ExternalLink,
 } from "lucide-react";
 import { BgSettings, GradientType, LightDir, bgPresets, defaultPresetFor, drawBackground, drawCanShadow } from "@/lib/background";
 import { CopyGroup, Slide, copyGroups, groupForProduct, headerLines, originalCount, storyTemplates, subLines } from "@/lib/copy";
 import { makeZip } from "@/lib/zip";
+import { StickerColour, StickerGroup, badgeTextColour, botanicalsFor, mix, paletteFor, stickerById, stickerSvg, stickers, svgUrl } from "@/lib/stickers";
+import { PropArr, SetSettings, SetShape, defaultSet, drawSet, drawWorld, propArrangements, propSpots, setGeometry, setPalettes, setShapes } from "@/lib/set";
 
 const products = {
   flourish: { name: "FLOURISH", flavour: "Butterfly Pea + Raspberry", color: "#0066FF", radial: "/assets/radial-flourish.jpg", soon: false },
@@ -74,6 +76,8 @@ function applyLogoStyle(d: Doc, k: "none" | "icon" | "wordmark" | "lockup" | "bo
   return { ...d, layers, t };
 }
 type T = { x: number; y: number; scale: number };
+type Repeat = "none" | "grid" | "scatter" | "border";
+type StickerLayer = { uid: string; kind: string; x: number; y: number; scale: number; rot: number; flip: boolean; opacity: number; colour: StickerColour; text?: string; repeat: Repeat; density: number };
 type Align = "left" | "center";
 type Tone = "white" | "silver" | "black";
 type Doc = {
@@ -91,6 +95,8 @@ type Doc = {
   lockup: { layout: "left" | "above"; spacing: number };
   order: OverlayKey[];
   carousel: { slides: Slide[]; active: number; size: "ig-square" | "ig-portrait"; base?: { t: Doc["t"]; size: number } };
+  set: SetSettings;
+  stickers: StickerLayer[];
   aligned: string | null;
   output: string;
   format: "png" | "jpg" | "webp";
@@ -119,11 +125,13 @@ const initialDoc: Doc = {
   lockup: { layout: "left", spacing: 22 },
   order: defaultOrder,
   carousel: { slides: [], active: 0, size: "ig-square" },
+  set: defaultSet("flourish"),
+  stickers: [],
   aligned: null,
   output: "ig-square",
   format: "png",
 };
-const STORE = "flowerful-studio-v2";
+const STORE = "flowerful-studio-v3";
 const overlayMeta: Record<OverlayKey, { label: string; layer: keyof Doc["layers"]; tab: Tab }> = {
   sub: { label: "Sub line", layer: "sub", tab: "text" },
   header: { label: "Header", layer: "header", tab: "text" },
@@ -138,8 +146,8 @@ const fixedLayers: Array<{ key: keyof Doc["layers"]; label: string; tab: Tab }> 
   { key: "wash", label: "Colour wash", tab: "brand" },
   { key: "background", label: "Background", tab: "background" },
 ];
-type Tab = "background" | "can" | "text" | "brand" | "carousel" | "motion" | "export";
-const tabs: Array<[Tab, string]> = [["background", "Background"], ["can", "Can"], ["text", "Text"], ["brand", "Brand"], ["carousel", "Carousel"], ["motion", "Motion"], ["export", "Export"]];
+type Tab = "set" | "stickers" | "background" | "can" | "text" | "brand" | "carousel" | "motion" | "export";
+const tabs: Array<[Tab, string]> = [["set", "Set"], ["stickers", "Stickers"], ["background", "Background"], ["can", "Can"], ["text", "Text"], ["brand", "Brand"], ["carousel", "Carousel"], ["motion", "Motion"], ["export", "Export"]];
 
 const imgCache = new Map<string, Promise<HTMLImageElement>>();
 const loadImg = (src: string) => {
@@ -151,13 +159,14 @@ const loadImg = (src: string) => {
   }
   return pr;
 };
-type MotionKind = "drift" | "sweep" | "petals" | "typeon";
+type MotionKind = "drift" | "sweep" | "petals" | "typeon" | "reveal";
 type Anim = { kind: MotionKind; t: number };
 const motionPresets: Array<[MotionKind, string, string]> = [
   ["drift", "Gradient drift", "Colours breathe and rotate slowly"],
   ["sweep", "Light sweep", "Light travels left to right, the can shadow follows"],
   ["petals", "Drifting petals", "Flower artwork floats gently through the frame"],
   ["typeon", "Header type-on", "The header writes itself, then holds"],
+  ["reveal", "Colour-change reveal", "FLOURISH turns from blue to violet and back, like the real drink"],
 ];
 const STORY_TOP = 250 / 1920, STORY_BOTTOM = 340 / 1920;
 const safeBand = (id: string) => (id === "ig-story" ? [STORY_TOP * 100, 100 - STORY_BOTTOM * 100] : [0, 100]);
@@ -180,7 +189,211 @@ function reflow(d: Doc, fromId: string, toId: string): Doc {
     const half = (68 * t.product.scale) / 2, bottom = t1 - 1;
     if (t.product.y + half > bottom) t.product.y = bottom - half;
   }
-  return { ...d, output: toId, t };
+  const stickers = d.stickers.map((st) => ({ ...st, y: Math.max(t0 + 3, Math.min(t1 - 3, t0 + ((st.y - f0) / (f1 - f0)) * (t1 - t0))), scale: st.scale * Math.pow((from.h / from.w) / (to.h / to.w), 0.3) }));
+  return { ...d, output: toId, t, stickers };
+}
+// ---------- v3 helpers ----------
+let uidN = 0;
+const uid = () => `s${Date.now().toString(36)}${(uidN++).toString(36)}`;
+const groupOf = (p: ProductKey): CopyGroup => groupForProduct(p);
+function lerpHex(a: string, b: string, k: number) {
+  const pa = parseInt(a.slice(1, 7), 16), pb = parseInt(b.slice(1, 7), 16);
+  const ch = (sh: number) => Math.round(((pa >> sh) & 255) * (1 - k) + ((pb >> sh) & 255) * k);
+  return "#" + [16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, "0")).join("");
+}
+const measureCtx = () => { const c = document.createElement("canvas").getContext("2d")!; return c; };
+let mctx: CanvasRenderingContext2D | null = null;
+// badge text size in the same unit as w, shrunk to fit the badge
+function badgeFs(def: ReturnType<typeof stickerById>, text: string, w: number) {
+  const a = def.aspect ?? 1, h = w / a, ta = def.textArea!;
+  const lines = text.split("\n");
+  let fs = h * ta.size;
+  if (typeof document === "undefined") return fs;
+  mctx ??= measureCtx();
+  mctx.font = `500 100px Fredoka`;
+  const widest = Math.max(...lines.map((l) => mctx!.measureText(l).width * (1 + 0.04 * l.length / 10))) / 100;
+  if (widest * fs > w * ta.w) fs = (w * ta.w) / widest;
+  return fs;
+}
+const stickerW = (W: number, st: StickerLayer) => W * 0.16 * st.scale;
+const layoutKinds = [["centre", "Hero centre"], ["poster", "Type poster"], ["side", "Can left, type right"]] as const;
+type LayoutKind = (typeof layoutKinds)[number][0];
+// fit the can between the sub line and the plinth top, and inside the plinth's top face
+function fitCan(d: Doc): Doc {
+  if (!d.set.on || !d.layers.product) return d;
+  const o = outputs.find((x) => x.id === d.output)!, W = o.w, H = o.h;
+  const cx = (W * d.t.product.x) / 100, g = setGeometry(W, H, d.set, cx);
+  const textBottom = d.layers.sub ? d.t.sub.y + 5 : d.layers.header ? d.t.header.y + 8 : 8;
+  const avail = g.canBase - (H * textBottom) / 100;
+  const aspect = d.product === "lineup" ? 1.6 : 0.36;
+  let h = Math.min(avail, H * 0.6);
+  const maxW = d.product === "lineup" ? g.topW * 1.1 : g.topW * 0.78;
+  if (h * aspect > maxW) h = maxW / aspect;
+  const scale = d.product === "lineup" ? (h * aspect) / (W * 0.82) : h / (H * 0.68);
+  return { ...d, t: { ...d.t, product: { ...d.t.product, scale: Math.max(0.2, Math.min(1.2, scale)) } } };
+}
+function fitSize(text: string, max: number, widthPct: number) {
+  const longest = Math.max(...text.split("\n").map((l) => l.length), 1);
+  return Math.min(max, Math.round((widthPct / (longest * 0.64)) * 10) / 10);
+}
+function applyLayout(d0: Doc, k: LayoutKind): Doc {
+  const d = { ...d0, t: { ...d0.t }, header: { ...d0.header }, sub: { ...d0.sub } };
+  const [a] = safeBand(d.output), off = a;
+  if (k === "centre") {
+    d.t.header = { x: 50, y: off + 17, scale: 1 }; d.t.sub = { x: 50, y: off + 25, scale: 1 }; d.t.product = { ...d.t.product, x: 50 };
+    d.header.align = "center"; d.sub.align = "center"; d.header.size = fitSize(d.header.text, 7.4, 90);
+    d.set = { ...d.set, floor: d.output === "ig-story" ? 80 : 86 };
+  } else if (k === "poster") {
+    d.t.header = { x: 50, y: off + 24, scale: 1 }; d.t.sub = { x: 50, y: off + 37, scale: 1 }; d.t.product = { ...d.t.product, x: 70 };
+    d.header.align = "center"; d.sub.align = "center"; d.header.size = fitSize(d.header.text, 10.4, 92);
+    d.set = { ...d.set, floor: d.output === "ig-story" ? 80 : 88, size: 0.8 };
+  } else {
+    d.t.header = { x: 72, y: off + 36, scale: 0.52 }; d.t.sub = { x: 72, y: off + 48, scale: 0.6 }; d.t.product = { ...d.t.product, x: 30 };
+    d.header.align = "left"; d.sub.align = "left"; d.header.size = fitSize(d.header.text, 10, 50 / 0.52);
+    d.set = { ...d.set, floor: d.output === "ig-story" ? 80 : 86 };
+  }
+  d.t.wordmark = { x: 50, y: off + 8, scale: 0.6 };
+  d.layers = { ...d.layers, wordmark: !d.layers.lockup && !d.layers.icon ? true : d.layers.wordmark };
+  return fitCan(d);
+}
+const stickerSpots: Record<LayoutKind, Array<[number, number]>> = {
+  centre: [[15, 48], [85, 46], [84, 62], [16, 64], [86, 30]],
+  poster: [[18, 62], [84, 14], [30, 72], [14, 48]],
+  side: [[86, 18], [88, 64], [60, 64], [14, 22]],
+};
+function makeSticker(kind: string, x: number, y: number, product: ProductKey, extra: Partial<StickerLayer> = {}): StickerLayer {
+  const def = stickerById(kind);
+  const colour: StickerColour = def.group === "Botanicals" ? "natural" : "white";
+  const text = def.id === "badge-tag" ? products[product].name : def.text;
+  return { uid: uid(), kind, x, y, scale: def.group === "Badges" ? 0.9 : 0.7, rot: 0, flip: false, opacity: 1, colour, text, repeat: "none", density: 1, ...extra };
+}
+export type Locks = { set: boolean; palette: boolean; stickers: boolean; layout: boolean; line: boolean };
+function shuffleDoc(d: Doc, locks: Locks): { doc: Doc; layout: LayoutKind } {
+  const r = Math.random, pick = <X,>(a: readonly X[]) => a[Math.floor(r() * a.length)];
+  let n: Doc = { ...d, set: { ...d.set } };
+  const pals = setPalettes[n.product] ?? setPalettes.lineup;
+  if (!locks.set) {
+    n.set = { ...n.set, on: true, shape: pick(setShapes.map((x) => x[0]).filter((x) => n.product !== "lineup" || x === "slab" || x === "cube")), props: pick(["base", "both", "top", "scatter", "base"] as PropArr[]), light: r() < 0.7 ? "left" : "right", size: 0.9 + r() * 0.25, world: true, shadow: 50 + Math.round(r() * 30) };
+  }
+  if (!locks.palette) {
+    const a = pick(pals), b = r() < 0.35 ? pick(pals) : a;
+    n.set = { ...n.set, wall: a.wall, block: b.block };
+    const bgs = bgPresets.filter((x) => x.group.toLowerCase() === n.product);
+    if (bgs.length) { const pr = pick(bgs); n = { ...n, bg: pr.s, bgPreset: pr.id, bgSource: "create" }; }
+  }
+  const layout: LayoutKind = locks.layout ? "centre" : pick(layoutKinds.map((x) => x[0]));
+  if (!locks.layout) n = applyLayout(n, layout); else n = fitCan(n);
+  if (!locks.line) {
+    const g = groupOf(n.product), lines = headerLines[g];
+    n = { ...n, header: { ...n.header, text: pick(lines) }, sub: { ...n.sub, text: r() < 0.6 ? flavourText(n.product) : pick(subLines[g] ?? [flavourText(n.product)]), custom: true } };
+    const [mx, wp] = layout === "centre" ? [7.4, 90] : layout === "poster" ? [10.4, 92] : [10, 50 / 0.52];
+    n = fitCan({ ...n, header: { ...n.header, size: fitSize(n.header.text, mx, wp) } });
+  }
+  if (!locks.stickers) {
+    const pool = ["petal", "petals", "leaf", "sparkle", "sparkles", "badge-ribbon", "badge-tag", n.product === "flow" || n.product === "float" ? "badge-round" : "badge-pill"];
+    const count = 1 + Math.floor(r() * 3), spots = [...stickerSpots[layout]].sort(() => r() - 0.5), chosen: StickerLayer[] = [];
+    const used = new Set<string>();
+    for (let i = 0; i < count; i++) {
+      let k = pick(pool); let tries = 0;
+      while ((used.has(k) || (stickerById(k).group === "Badges" && [...used].some((u) => stickerById(u).group === "Badges"))) && tries++ < 10) k = pick(pool);
+      used.add(k);
+      const [x, y] = spots[i % spots.length];
+      const [a0] = safeBand(n.output);
+      chosen.push(makeSticker(k, x, a0 + y * (n.output === "ig-story" ? 0.69 : 1), n.product, { rot: Math.round((r() - 0.5) * 30), scale: stickerById(k).group === "Badges" ? 0.85 : 0.5 + r() * 0.3 }));
+    }
+    n = { ...n, stickers: [...d.stickers.filter((x) => x.repeat !== "none"), ...chosen] };
+  }
+  return { doc: n, layout };
+}
+// same composition in another flavour world
+function seriesDoc(d: Doc, to: ProductKey): Doc {
+  if (to === d.product) return d;
+  const fromPals = setPalettes[d.product] ?? setPalettes.lineup, toPals = setPalettes[to] ?? setPalettes.lineup;
+  const wi = Math.max(0, fromPals.findIndex((x) => x.wall === d.set.wall)), bi = Math.max(0, fromPals.findIndex((x) => x.block === d.set.block));
+  const g0 = groupOf(d.product), g1 = groupOf(to), hi = headerLines[g0].indexOf(d.header.text);
+  const bf = botanicalsFor(d.product), bt = botanicalsFor(to);
+  const pi = bgPresets.filter((x) => x.group.toLowerCase() === d.product).findIndex((x) => x.id === d.bgPreset);
+  const tb = bgPresets.filter((x) => x.group.toLowerCase() === to);
+  return {
+    ...d, product: to, aligned: null,
+    set: { ...d.set, wall: toPals[wi % toPals.length].wall, block: toPals[bi % toPals.length].block },
+    ...(d.bgSource === "create" && tb.length ? { bg: tb[Math.max(0, pi) % tb.length].s, bgPreset: tb[Math.max(0, pi) % tb.length].id } : {}),
+    header: { ...d.header, text: hi >= 0 && g0 !== g1 ? headerLines[g1][hi % headerLines[g1].length] : d.header.text },
+    sub: { ...d.sub, text: d.sub.text.toLowerCase() === flavourText(d.product).toLowerCase() || !d.sub.custom ? flavourText(to) : d.sub.text },
+    stickers: d.stickers.map((st) => ({ ...st, kind: bf.includes(st.kind) ? bt[bf.indexOf(st.kind)] : st.kind, text: st.kind === "badge-tag" ? products[to].name : st.text })),
+  };
+}
+// brand safety check (en-GB house rules, UAE GSO 2333 claim caution)
+const claimWords = ["healthy", "health", "detox", "boost", "energy", "energis", "immun", "cure", "heal", "fat burn", "weight", "slim", "skinny", "gut", "digest", "superfood", "vitamin", "antioxidant", "guilt-free", "guilt free", "sugar-free", "sugar free", "zero sugar", "no sugar", "low calorie", "calorie", "wellness", "medicinal", "focus your mind", "brain", "stress", "anxiety", "sleep better", "hydrat"];
+const clicheWords = ["desert", "camel", "oasis", "lantern", "majlis", "mashrabiya", "arabian", "sheikh", "habibi", "yalla", "thirst", "quench", "splash", "refreshing", "zesty"];
+type Issue = { level: "stop" | "warn"; msg: string };
+function checkDoc(d: Doc, extra: string[] = []): Issue[] {
+  const texts: Array<[string, string]> = [];
+  if (d.layers.header) texts.push(["Header", d.header.text]);
+  if (d.layers.sub) texts.push(["Sub line", d.sub.text]);
+  d.stickers.forEach((st) => st.text && texts.push([`${stickerById(st.kind).name} badge`, st.text]));
+  d.carousel.slides.forEach((sl, i) => { texts.push([`Slide ${i + 1} header`, sl.header]); texts.push([`Slide ${i + 1} sub line`, sl.sub]); });
+  extra.forEach((x, i) => texts.push([`Text ${i + 1}`, x]));
+  const out: Issue[] = [];
+  for (const [where, t] of texts) {
+    const low = t.toLowerCase().replace(/\n/g, " ");
+    if (/[\u2014\u2013]/.test(t)) out.push({ level: "stop", msg: `${where} uses a dash (— or –). Use a comma, full stop or "&".` });
+    const c = claimWords.find((w) => low.includes(w));
+    if (c) out.push({ level: "stop", msg: `${where} contains "${c}", which can read as a health or performance claim.` });
+    const k = clicheWords.find((w) => low.includes(w));
+    if (k) out.push({ level: "warn", msg: `${where} contains "${k}", a regional or beverage cliché.` });
+    if (/\b(color|flavor|favorite|center)\b/i.test(t)) out.push({ level: "warn", msg: `${where} uses US spelling. Use en-GB (colour, flavour, favourite, centre).` });
+  }
+  const W = outputs.find((o) => o.id === d.output)!.w;
+  const subPx = (d.sub.size / 100) * W * d.t.sub.scale * (1080 / W);
+  if (d.layers.sub && subPx < 20) out.push({ level: "warn", msg: `Sub line is tiny (${Math.round(subPx)}px at 1080 wide). Aim for 22px or more so it reads on a phone.` });
+  const hPx = (d.header.size / 100) * 1080 * d.t.header.scale;
+  if (d.layers.header && hPx < 36) out.push({ level: "warn", msg: `Header is small (${Math.round(hPx)}px). Headers read best from 48px.` });
+  const n = d.stickers.length;
+  if (n > 3) out.push({ level: "warn", msg: `${n} stickers. Keep it to 3 or fewer so the post stays calm.` });
+  if (!d.layers.wordmark && !d.layers.lockup && !d.layers.icon) out.push({ level: "warn", msg: "No Flowerful logo on the artboard." });
+  if (d.output === "ig-story") {
+    const bad = (["header", "sub", "wordmark", "lockup", "icon"] as OverlayKey[]).filter((k) => d.layers[overlayMeta[k].layer] && (d.t[k].y < STORY_TOP * 100 || d.t[k].y > 100 - STORY_BOTTOM * 100));
+    if (bad.length) out.push({ level: "warn", msg: `${bad.map((k) => overlayMeta[k].label).join(", ")} sit in the Story UI zones.` });
+  }
+  return out;
+}
+type Wizard = { step: number; product: ProductKey; goal: string; format: string; style: string; layout: LayoutKind; line: string; props: boolean; stickers: boolean; logo: "wordmark" | "lockup" | "icon" };
+const goals = [["awareness", "Awareness", "Say hello to Flowerful"], ["intro", "Flavour intro", "Show one can and its colour world"], ["story", "Ingredient story", "Five slides on what is inside"], ["engage", "Engagement", "A line that gets a reply"], ["launch", "Launch or drop", "NEW or COMING SOON moment"], ["brand", "Brand moment", "Calm, premium, logo-led"]] as const;
+const formats = [["ig-square", "Post 1:1"], ["ig-portrait", "Post 4:5"], ["ig-story", "Story 9:16"], ["reel", "Reel loop 9:16"], ["carousel", "Carousel, 5 slides"]] as const;
+const guidedStyles = [
+  ["plinth", "Monochrome plinth", "One can on stacked blocks, all in one hue, ingredients at the base. Your favourite."],
+  ["steps", "Architectural steps", "Stepped terraces in a pale sky of the flavour colour."],
+  ["world", "One-colour world", "Low slab, scattered ingredients, long soft shadow."],
+  ["poster", "Graphic type poster", "Big Fredoka line, can small, flat flavour colour."],
+  ["pattern", "Pattern and repeat", "Botanical icon repeat behind the can."],
+  ["reveal", "Colour-change reveal", "FLOURISH turning blue to violet as a Reel loop."],
+] as const;
+function composeGuided(base: Doc, w: Wizard): Doc {
+  let d: Doc = { ...base, product: w.product, carousel: { ...base.carousel, slides: [], base: undefined }, stickers: [], aligned: null };
+  const tb = bgPresets.filter((x) => x.group.toLowerCase() === w.product);
+  d = { ...d, bg: tb[0]?.s ?? d.bg, bgPreset: tb[0]?.id ?? d.bgPreset, bgSource: "create", output: w.format === "reel" ? "ig-story" : w.format === "carousel" ? "ig-portrait" : w.format };
+  const pals = setPalettes[w.product] ?? setPalettes.lineup;
+  const shape: SetShape = w.style === "steps" ? "steps" : w.style === "world" ? "slab" : w.style === "reveal" ? "cube" : w.style === "poster" ? "cube" : "stack";
+  const pal = w.style === "steps" ? pals[2 % pals.length] : pals[0];
+  d.set = { ...defaultSet(w.product), on: w.style !== "pattern", shape, wall: pal.wall, block: pal.block, props: !w.props ? "none" : w.style === "world" ? "scatter" : w.style === "steps" ? "top" : "base" };
+  d.layers = { ...d.layers, product: true, shadow: true, header: true, sub: true, lockup: w.logo === "lockup", wordmark: w.logo === "wordmark", icon: w.logo === "icon", radial: false, wash: false };
+  d.header = { ...d.header, text: w.line, caps: true };
+  d.sub = { ...d.sub, text: flavourText(w.product), custom: true, caps: true };
+  d = applyLayout(d, w.style === "poster" ? "poster" : w.layout);
+  if (w.logo === "lockup") d.t.lockup = { x: 50, y: d.t.wordmark.y, scale: 0.8 };
+  if (w.logo === "icon") d.t.icon = { x: 50, y: d.t.wordmark.y + 1, scale: 0.36 };
+  const [a0] = safeBand(d.output), k = d.output === "ig-story" ? 0.69 : 1;
+  const st: StickerLayer[] = [];
+  if (w.style === "pattern") st.push(makeSticker(botanicalsFor(w.product)[0], 50, 50, w.product, { repeat: "scatter", opacity: 0.22, colour: "white", scale: 0.55 }));
+  if (w.goal === "launch") st.push(makeSticker(w.product === "flow" || w.product === "float" ? "badge-round" : "badge-pill", 84, a0 + 46 * k, w.product, { rot: 10 }));
+  if (w.stickers) {
+    st.push(makeSticker("petals", 16, a0 + 50 * k, w.product, { rot: -14, scale: 0.55 }));
+    if (w.goal !== "launch") st.push(makeSticker("sparkles", 85, a0 + 44 * k, w.product, { scale: 0.42 }));
+  }
+  if (w.goal === "story") st.push(makeSticker("badge-swipe", 82, a0 + 90 * k, w.product, { scale: 0.7 }));
+  d.stickers = st;
+  return d;
 }
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -234,6 +447,13 @@ export default function Home() {
   const [showSafe, setShowSafe] = useState(true);
   const [motionPreview, setMotionPreview] = useState(false);
   const [thumbs, setThumbs] = useState<string[]>([]);
+  const [selSticker, setSelSticker] = useState<string | null>(null);
+  const [stGroup, setStGroup] = useState<StickerGroup>("Botanicals");
+  const [locks, setLocks] = useState<Locks>({ set: false, palette: false, stickers: false, layout: false, line: false });
+  const [shuffles, setShuffles] = useState(0);
+  const [wiz, setWiz] = useState<Wizard | null>(null);
+  const [gate, setGate] = useState<{ issues: Issue[]; run: () => void } | null>(null);
+  const [seriesSoon, setSeriesSoon] = useState(false);
   // AI (secondary) state is per session only
   const [theme, setTheme] = useState<ThemeKey>("Botanical Couture");
   const [subtheme, setSubtheme] = useState<string>(themes["Botanical Couture"][0]);
@@ -255,7 +475,7 @@ export default function Home() {
       if (raw) {
         const saved = JSON.parse(raw) as Partial<Doc>;
         const order = saved.order && defaultOrder.every((k) => saved.order!.includes(k)) ? saved.order.filter((k) => defaultOrder.includes(k)) : defaultOrder;
-        replace({ ...initialDoc, ...saved, order, carousel: { ...initialDoc.carousel, ...saved.carousel }, lockup: { ...initialDoc.lockup, ...saved.lockup }, layers: { ...initialDoc.layers, ...saved.layers }, t: { ...initialDoc.t, ...saved.t } });
+        replace({ ...initialDoc, ...saved, order, carousel: { ...initialDoc.carousel, ...saved.carousel }, set: { ...initialDoc.set, ...saved.set }, stickers: saved.stickers ?? [], lockup: { ...initialDoc.lockup, ...saved.lockup }, layers: { ...initialDoc.layers, ...saved.layers }, t: { ...initialDoc.t, ...saved.t } });
         if (saved.product) setCopyTab(groupForProduct(saved.product));
       }
     } catch {}
@@ -320,7 +540,9 @@ export default function Home() {
     let w: number, h: number;
     if (d.product === "lineup") { w = W * 0.82 * t.scale; h = w / a; }
     else { h = H * 0.68 * t.scale; w = h * a; }
-    return { cx: (W * t.x) / 100, cy: (H * t.y) / 100, w, h };
+    const cx = (W * t.x) / 100;
+    if (d.set.on) { const g = setGeometry(W, H, d.set, cx); return { cx, cy: g.canBase - h / 2 + h * 0.006, w, h }; }
+    return { cx, cy: (H * t.y) / 100, w, h };
   }, [canAspect]);
 
   // background base: gradient or image, plus can shadow. Same code paints preview and export.
@@ -329,7 +551,17 @@ export default function Home() {
     let bg = d.bg, lp: [number, number] | undefined;
     if (anim?.kind === "drift") bg = { ...bg, angle: bg.angle + 16 * Math.sin(TAU * anim.t), lightStrength: bg.lightStrength * (0.85 + 0.15 * Math.cos(TAU * anim.t)) };
     if (anim?.kind === "sweep") lp = [0.5 - 0.46 * Math.cos(TAU * anim.t), 0.22 + 0.1 * Math.sin(TAU * anim.t)];
-    if (d.layers.background) {
+    let set = d.set;
+    if (anim?.kind === "reveal") {
+      const k = 0.5 - 0.5 * Math.cos(TAU * anim.t), ease = k * k * (3 - 2 * k);
+      const v1 = d.product === "flourish" ? "#7A45F0" : (setPalettes[d.product] ?? setPalettes.lineup)[1 % (setPalettes[d.product] ?? setPalettes.lineup).length].block;
+      const v2 = d.product === "flourish" ? "#A54BE0" : mix(v1, 0.2);
+      set = { ...set, wall: lerpHex(set.wall, v1, ease), block: lerpHex(set.block, mix(v1, 0.08), ease) };
+      bg = { ...bg, c1: lerpHex(bg.c1, v1, ease), c2: lerpHex(bg.c2, v2, ease) };
+    }
+    const world = set.on && set.world;
+    if (world && d.layers.background && !(d.bgSource === "image" && d.image)) drawWorld(c, W, H, set);
+    else if (d.layers.background) {
       if (d.bgSource === "image" && d.image) {
         const bg = await loadImg(d.image);
         const cover = Math.max(W / bg.width, H / bg.height);
@@ -353,11 +585,55 @@ export default function Home() {
       }
       c.restore();
     }
+    // repeated stickers become a pattern on the wall, behind the set and can
+    for (const st of d.stickers) if (st.repeat !== "none") await drawStickerLayer(c, W, H, d, st, true);
+    if (set.on) {
+      const b = canBox(W, H, d);
+      const g = drawSet(c, W, H, set, b.cx, b.w, d.layers.product ? b.h : 0, anim?.kind === "sweep" ? 0.4 * Math.sin(TAU * anim.t) : 0);
+      if (set.props !== "none" && d.product !== "lineup") {
+        const kinds = botanicalsFor(d.product), dir = set.light === "left" ? 1 : -1;
+        for (const sp of propSpots(W, H, set, b.cx, b.w, set.props)) {
+          const def = stickerById(kinds[sp.i % kinds.length]), img = await loadImg(svgUrl(stickerSvg(def.id, def.natural)));
+          const pw = W * 0.085 * sp.s * set.propSize, ph = pw;
+          // contact + cast shadow on the surface it rests on
+          c.save(); c.globalAlpha = 0.35; c.fillStyle = mix(set.wall, -0.55);
+          c.beginPath(); c.ellipse(sp.x + dir * pw * 0.35, sp.y, pw * 0.62, pw * 0.1, 0, 0, TAU); c.fill(); c.restore();
+          c.save(); c.translate(sp.x, sp.y); c.rotate((sp.r * Math.PI) / 180 * 0.4);
+          c.drawImage(img, -pw / 2, -ph * 0.94, pw, ph); c.restore();
+        }
+        void g;
+      }
+    }
     if (d.layers.product && d.layers.shadow) {
       const b = canBox(W, H, d);
-      drawCanShadow(c, b.cx, b.cy + b.h / 2 - b.h * 0.012, d.product === "lineup" ? b.w * 0.8 : b.w, d.bgSource === "create" ? d.bg : null, 1, lp ?? (d.bgSource === "image" ? undefined : undefined));
+      drawCanShadow(c, b.cx, b.cy + b.h / 2 - b.h * 0.012, d.product === "lineup" ? b.w * 0.8 : b.w, d.set.on ? { ...d.bg, light: d.set.light } : d.bgSource === "create" ? d.bg : null, d.set.on ? 0.8 : 1, lp);
     }
   }, [canBox]);
+  // stickers: single layers sit above the artwork; repeats become a pattern
+  async function drawStickerLayer(c: CanvasRenderingContext2D, W: number, H: number, d: Doc, st: StickerLayer, asPattern = false) {
+    const def = stickerById(st.kind); if (!def) return;
+    const pal = paletteFor(def, st.colour, products[d.product].color);
+    const img = await loadImg(svgUrl(stickerSvg(def.id, pal)));
+    const w = stickerW(W, st), h = w / (def.aspect ?? 1);
+    const one = (x: number, y: number, rot: number, sc = 1) => {
+      c.save(); c.globalAlpha = st.opacity; c.translate(x, y); c.rotate((rot * Math.PI) / 180); c.scale(st.flip ? -sc : sc, sc);
+      c.drawImage(img, -w / 2, -h / 2, w, h);
+      if (def.textArea && st.text) {
+        if (st.flip) c.scale(-1, 1);
+        const fs = badgeFs(def, st.text, w), lines = st.text.split("\n");
+        c.font = `500 ${fs}px Fredoka`; c.fillStyle = badgeTextColour(def, pal); c.textAlign = "center"; c.textBaseline = "middle";
+        (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${fs * 0.04}px`;
+        const cx = (def.textArea.x - 0.5) * w, cy = (def.textArea.y - 0.5) * h;
+        lines.forEach((ln, i) => c.fillText(ln, cx, cy + (i - (lines.length - 1) / 2) * fs * 1.02 + fs * 0.04));
+      }
+      c.restore();
+    };
+    if (!asPattern || st.repeat === "none") { one((W * st.x) / 100, (H * st.y) / 100, st.rot); return; }
+    const step = (w * 1.9) / st.density;
+    if (st.repeat === "grid") { let row = 0; for (let y = step / 2; y < H + step; y += step * 0.9, row++) for (let x = (row % 2 ? step / 2 : 0); x < W + step; x += step) one(x, y, st.rot); }
+    if (st.repeat === "scatter") { let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647); const n = Math.round(((W * H) / (step * step)) * 1.1); for (let i = 0; i < n; i++) one(rnd() * W, rnd() * H, st.rot + (rnd() - 0.5) * 120, 0.6 + rnd() * 0.5); }
+    if (st.repeat === "border") { const m = w * 0.62, gap = (w * 1.35) / st.density; for (let x = m; x <= W - m + 1; x += gap) { one(x, m, st.rot); one(x, H - m, st.rot); } for (let y = m + gap; y < H - m - gap / 2; y += gap) { one(m, y, st.rot); one(W - m, y, st.rot); } }
+  }
 
   useEffect(() => {
     const cv = baseRef.current;
@@ -540,6 +816,7 @@ export default function Home() {
           await drawMark(WORD.src, x0 + g.word.x * s2, y0 + g.word.y * s2, g.word.w * s2, g.word.h * s2);
         } else if (k === "header" || k === "sub") drawText(k);
       }
+      for (const st of d.stickers) if (st.repeat === "none") await drawStickerLayer(c, W, H, d, st);
   };
   const fontsReady = () => Promise.all([document.fonts.load(`500 40px Fredoka`), document.fonts.load(`600 20px Inter`)]);
   const renderToCanvas = async (d: Doc, W: number, H: number) => {
@@ -547,6 +824,7 @@ export default function Home() {
     await renderDoc(cv.getContext("2d")!, W, H, d);
     return cv;
   };
+  const guarded = (fn: () => void, extra: string[] = []) => () => { const issues = checkDoc(doc, extra); if (issues.length) setGate({ issues, run: fn }); else fn(); };
   async function exportArt() {
     setBusy(true);
     try {
@@ -689,6 +967,95 @@ export default function Home() {
     }
     return <Overlay key={k} {...common} className="o-text">{txt(k)}</Overlay>;
   };
+  // ---------- v3 actions ----------
+  const setSet = (v: Partial<SetSettings>, key: string | null = null) => commit((d) => fitCan({ ...d, set: { ...d.set, ...v } }), key);
+  const updSticker = (id: string, v: Partial<StickerLayer>, key: string | null = null) => commit((d) => ({ ...d, stickers: d.stickers.map((x) => (x.uid === id ? { ...x, ...v } : x)) }), key);
+  function addSticker(kind: string) {
+    const st = makeSticker(kind, 50 + (Math.random() - 0.5) * 40, 44 + (Math.random() - 0.5) * 20, doc.product);
+    commit((d) => ({ ...d, stickers: [...d.stickers, st] }));
+    setSelSticker(st.uid); setSelected(null);
+  }
+  function doShuffle() {
+    const r = shuffleDoc(doc, locks);
+    commit(() => r.doc);
+    setShuffles((n) => n + 1); setSelSticker(null); setSelected(null);
+    setNotice(`Shuffled: ${r.doc.set.on ? setShapes.find((x) => x[0] === r.doc.set.shape)![1].toLowerCase() + " set, " : ""}${layoutKinds.find((x) => x[0] === r.layout)![1].toLowerCase()} layout, ${r.doc.stickers.filter((x) => x.repeat === "none").length} sticker(s).`);
+  }
+  function beginStickerDrag(e: React.PointerEvent, st: StickerLayer, mode: "move" | "resize" | "rotate") {
+    e.preventDefault(); e.stopPropagation();
+    setSelSticker(st.uid); setSelected(null); setTab("stickers");
+    const rect = boardRef.current!.getBoundingClientRect(), sx = e.clientX, sy = e.clientY, gk = `sd-${st.uid}-${Date.now()}`;
+    const cx = rect.left + (rect.width * st.x) / 100, cy = rect.top + (rect.height * st.y) / 100;
+    const move = (ev: PointerEvent) => {
+      if (mode === "move") updSticker(st.uid, { x: Math.max(0, Math.min(100, st.x + ((ev.clientX - sx) / rect.width) * 100)), y: Math.max(0, Math.min(100, st.y + ((ev.clientY - sy) / rect.height) * 100)) }, gk);
+      else if (mode === "resize") updSticker(st.uid, { scale: Math.max(0.15, Math.min(4, st.scale * (Math.hypot(ev.clientX - cx, ev.clientY - cy) / Math.max(8, Math.hypot(sx - cx, sy - cy))))) }, gk);
+      else updSticker(st.uid, { rot: Math.round(((Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90 + 360) % 360) > 180 ? Math.round(((Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90 + 360) % 360) - 360 : Math.round(((Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90 + 360) % 360) }, gk);
+    };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  }
+  const renderSticker = (st: StickerLayer) => {
+    const def = stickerById(st.kind); if (!def) return null;
+    const pal = paletteFor(def, st.colour, p.color), w = 16 * st.scale, h = w / (def.aspect ?? 1), on = selSticker === st.uid;
+    const fs = def.textArea && st.text ? badgeFs(def, st.text, w) : 0;
+    return (
+      <div key={st.uid} className={`ov o-sticker ${on ? "sel" : ""}`} style={{ left: `${st.x}%`, top: `${st.y}%`, width: `${w}cqw`, height: `${h}cqw`, opacity: st.opacity, transform: `translate(-50%, -50%) rotate(${st.rot}deg)` }} onPointerDown={(e) => beginStickerDrag(e, st, "move")}>
+        <img src={svgUrl(stickerSvg(def.id, pal))} alt={def.name} style={{ transform: st.flip ? "scaleX(-1)" : undefined }} draggable={false} />
+        {def.textArea && st.text && (
+          <div className="st-text" style={{ left: `${def.textArea.x * 100}%`, top: `${def.textArea.y * 100}%`, fontSize: `${fs}cqw`, color: badgeTextColour(def, pal), letterSpacing: `${fs * 0.04}cqw` }}>
+            {st.text.split("\n").map((l, i) => <div key={i}>{l}</div>)}
+          </div>
+        )}
+        {on && <>
+          <button className="handle" aria-label="Resize sticker" onPointerDown={(e) => beginStickerDrag(e, st, "resize")} />
+          <button className="handle rot" aria-label="Rotate sticker" onPointerDown={(e) => beginStickerDrag(e, st, "rotate")} />
+        </>}
+      </div>
+    );
+  };
+  async function exportSeries() {
+    setBusy(true);
+    try {
+      await fontsReady();
+      const list: ProductKey[] = seriesSoon ? ["flourish", "focus", "flow", "float"] : ["flourish", "focus"], files = [];
+      for (const pk of list) {
+        const d2 = seriesDoc(doc, pk);
+        files.push({ name: `flowerful-series-${String(files.length + 1).padStart(2, "0")}-${pk}-${out.w}x${out.h}.${doc.format}`, blob: await toBlob(await renderToCanvas(d2, out.w, out.h), doc.format) });
+      }
+      const zip = await makeZip(files);
+      downloadBlob(zip, `flowerful-flavour-world-series-${out.ratio.replace(":", "x")}.zip`);
+      setNotice(`Flavour world series: ${list.map((x) => products[x].name).join(", ")} in one zip (${Math.round(zip.size / 1024)} KB).`);
+    } catch { setNotice("Series export failed."); }
+    finally { setBusy(false); }
+  }
+  const [seriesThumbs, setSeriesThumbs] = useState<string[]>([]);
+  useEffect(() => {
+    if (tab !== "export") return;
+    let dead = false;
+    const id = setTimeout(async () => {
+      await fontsReady();
+      const W = 150, H = Math.round((150 * out.h) / out.w), urls: string[] = [];
+      for (const pk of (seriesSoon ? ["flourish", "focus", "flow", "float"] : ["flourish", "focus"]) as ProductKey[]) urls.push((await renderToCanvas({ ...seriesDoc(doc, pk), format: "jpg" }, W, H)).toDataURL("image/jpeg", 0.8));
+      if (!dead) setSeriesThumbs(urls);
+    }, 400);
+    return () => { dead = true; clearTimeout(id); };
+  }, [doc, tab, seriesSoon]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openWizard = () => setWiz({ step: 0, product: doc.product === "lineup" ? "flourish" : doc.product, goal: "intro", format: "ig-portrait", style: "plinth", layout: "centre", line: headerLines[groupOf(doc.product)][0], props: true, stickers: true, logo: "wordmark" });
+  function finishWizard(w: Wizard) {
+    let d = composeGuided(doc, w);
+    if (w.format === "carousel" && (w.product === "flourish" || w.product === "focus")) {
+      const slides = storyTemplates[w.product].slides;
+      d = { ...d, carousel: { slides, active: 0, size: "ig-portrait", base: { t: d.t, size: d.header.size } } };
+      d = applySlide(d, 0);
+    }
+    commit(() => d);
+    if (w.format === "reel" || w.style === "reveal") { setMotion(w.style === "reveal" ? "reveal" : "drift"); setTab("motion"); setMotionPreview(true); }
+    else if (w.format === "carousel") setTab("carousel");
+    else setTab("set");
+    setWiz(null);
+    const issues = checkDoc(d);
+    setNotice(issues.length ? `Post ready. Safety check: ${issues.length} note(s), shown before export.` : "Post ready. Safety check passed.");
+  }
   const moveLayer = (k: OverlayKey, dir: 1 | -1) => commit((d) => {
     const o = [...d.order], i = o.indexOf(k), j = i + dir;
     if (j < 0 || j >= o.length) return d;
@@ -710,7 +1077,8 @@ export default function Home() {
           <button className="ghost icon" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)"><Redo2 /> Redo</button>
           <span className="sep" />
           <button className="ghost" onClick={() => { if (confirm("Start a fresh design? Undo can bring it back.")) commit(() => initialDoc); }}><RotateCcw /> New</button>
-          <button className="primary" onClick={exportArt} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${doc.format.toUpperCase()}`}</button>
+          <button className="ghost wiz-btn" onClick={openWizard}><WandSparkles /> Create a post</button>
+          <button className="primary" onClick={guarded(exportArt)} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${doc.format.toUpperCase()}`}</button>
         </div>
       </header>
       <div className="work">
@@ -757,10 +1125,11 @@ export default function Home() {
               </button>
             ))}
           </div>
-          <div className="shell" ref={shellRef} onPointerDown={() => setSelected(null)}>
+          <div className="shell" ref={shellRef} onPointerDown={() => { setSelected(null); setSelSticker(null); }}>
             <div className="artboard" ref={boardRef} style={{ width: board.w, height: board.h }}>
               <canvas ref={baseRef} className="base" />
               {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && renderOverlay(k))}
+              {doc.stickers.filter((x) => x.repeat === "none").map(renderSticker)}
               {doc.output === "ig-story" && showSafe && (
                 <>
                   <div className="safe top" style={{ height: `${STORY_TOP * 100}%` }}><span>Story UI · keep clear</span></div>
@@ -769,6 +1138,14 @@ export default function Home() {
               )}
               {selected && <div className="guide" style={{ left: `${doc.t[selected].x}%`, opacity: doc.t[selected].x === 50 ? 1 : 0 }} />}
             </div>
+          </div>
+          <div className="shuffle-bar">
+            <button className="primary" onClick={doShuffle}><Shuffle /> Shuffle</button>
+            {(Object.keys(locks) as Array<keyof Locks>).map((k) => (
+              <button key={k} className={`lock ${locks[k] ? "on" : ""}`} onClick={() => setLocks((l) => ({ ...l, [k]: !l[k] }))} title={locks[k] ? `Keep ${k}` : `Shuffle ${k}`}>
+                {locks[k] ? <Lock /> : <LockOpen />} {k[0].toUpperCase() + k.slice(1)}
+              </button>
+            ))}
           </div>
           <div className="stage-foot">
             <span>{out.label} · {out.w} × {out.h}px</span>
@@ -781,6 +1158,95 @@ export default function Home() {
         <aside className="right panel">
           <nav className="tabs">{tabs.map(([k, l]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}</nav>
           <div className="pane">
+            {tab === "set" && (
+              <>
+                <div className="card"><div className="card-h"><b>Plinth and set</b><Switch on={doc.set.on} onClick={() => setSet({ on: !doc.set.on })} /></div><small>Geometric blocks lit from the side with long crisp shadows. The can stands on top and follows when you drag it sideways.</small></div>
+                <Group label="Set presets">
+                  <div className="set-presets">
+                    {setPresets.map((sp) => (
+                      <button key={sp.name} className={doc.set.on && doc.set.shape === sp.shape && doc.set.props === sp.props ? "on" : ""} onClick={() => commit((d) => { const pals = setPalettes[d.product] ?? setPalettes.lineup, pl = pals[sp.pal % pals.length]; return fitCan({ ...d, set: { ...d.set, on: true, shape: sp.shape, props: sp.props, wall: pl.wall, block: sp.two ? pals[(sp.pal + 1) % pals.length].block : pl.block, light: sp.light, floor: sp.floor ?? d.set.floor, world: true } }); })}>
+                        <SetThumb s={{ ...doc.set, on: true, shape: sp.shape, props: sp.props, wall: (setPalettes[doc.product] ?? setPalettes.lineup)[sp.pal % (setPalettes[doc.product] ?? setPalettes.lineup).length].wall, block: (setPalettes[doc.product] ?? setPalettes.lineup)[(sp.pal + (sp.two ? 1 : 0)) % (setPalettes[doc.product] ?? setPalettes.lineup).length].block, light: sp.light }} />
+                        <span>{sp.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </Group>
+                {doc.set.on && (
+                  <>
+                    <Group label="Shape">
+                      <div className="seg wrap">{setShapes.map(([k, l]) => <button key={k} className={doc.set.shape === k ? "on" : ""} onClick={() => setSet({ shape: k })}>{l}</button>)}</div>
+                    </Group>
+                    <Group label="Colour world">
+                      <div className="swatches">
+                        {(setPalettes[doc.product] ?? setPalettes.lineup).map((pl) => <button key={pl.name} title={pl.name} className={doc.set.wall === pl.wall ? "on" : ""} onClick={() => setSet({ wall: pl.wall, block: pl.block })} style={{ background: `linear-gradient(135deg, ${pl.wall} 50%, ${pl.block} 50%)` }} />)}
+                      </div>
+                      <div className="row"><ColourPick label="Wall" value={doc.set.wall.toUpperCase()} onChange={(v) => setSet({ wall: v }, "set-wall")} /><ColourPick label="Blocks" value={doc.set.block.toUpperCase()} onChange={(v) => setSet({ block: v }, "set-block")} /></div>
+                      <label className="chk"><input type="checkbox" checked={doc.set.world} onChange={(e) => setSet({ world: e.target.checked })} /> One-colour world (wall and floor in the set colour)</label>
+                    </Group>
+                    <Group label="Light comes from">
+                      <div className="seg">{(["left", "right"] as const).map((l) => <button key={l} className={doc.set.light === l ? "on" : ""} onClick={() => setSet({ light: l })}>{l === "left" ? "Left" : "Right"}</button>)}</div>
+                    </Group>
+                    <Range label="Shadow length" min={0} max={100} value={doc.set.shadow} onChange={(v) => setSet({ shadow: v }, "set-sh")} />
+                    <Range label="Block size" unit="%" min={60} max={140} value={Math.round(doc.set.size * 100)} onChange={(v) => setSet({ size: v / 100 }, "set-size")} />
+                    <Range label="Floor line" unit="%" min={55} max={92} value={doc.set.floor} onChange={(v) => setSet({ floor: v }, "set-floor")} />
+                    <Group label="Ingredient props">
+                      <div className="seg wrap">{propArrangements.map(([k, l]) => <button key={k} className={doc.set.props === k ? "on" : ""} onClick={() => setSet({ props: k })}>{l}</button>)}</div>
+                      {doc.set.props !== "none" && <Range label="Prop size" unit="%" min={50} max={180} value={Math.round(doc.set.propSize * 100)} onChange={(v) => setSet({ propSize: v / 100 }, "set-ps")} />}
+                      <p className="hint">{doc.product === "lineup" ? "Props are per flavour; pick a single can to use them." : `${botanicalsFor(doc.product).map((k) => stickerById(k).name.toLowerCase()).join(" and ")}, resting on the floor or plinth with their own shadows.`}</p>
+                    </Group>
+                  </>
+                )}
+              </>
+            )}
+
+            {tab === "stickers" && (
+              <>
+                <div className="seg small wrap">{(["Botanicals", "Badges", "Shapes", "Lifestyle"] as StickerGroup[]).map((g) => <button key={g} className={stGroup === g ? "on" : ""} onClick={() => setStGroup(g)}>{g}</button>)}</div>
+                <div className="st-grid">
+                  {stickers.filter((x) => x.group === stGroup).sort((a, b) => Number(!!b.flavours?.includes(doc.product)) - Number(!!a.flavours?.includes(doc.product))).map((def) => {
+                    const pal = paletteFor(def, def.group === "Botanicals" ? "natural" : "flavour", p.color);
+                    return (
+                      <button key={def.id} title={`Add ${def.name}`} onClick={() => addSticker(def.id)} className={def.flavours?.includes(doc.product) ? "match" : ""}>
+                        <span className="st-prev" style={{ aspectRatio: `${def.aspect ?? 1}` }}><img src={svgUrl(stickerSvg(def.id, pal))} alt="" />{def.text && <em style={{ color: badgeTextColour(def, pal) }}>{def.id === "badge-tag" ? p.name : def.text.split("\n")[0]}</em>}</span>
+                        <small>{def.name}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="hint">Keep it to 1 to 3 per post. Badges never carry claims; edit the words below.</p>
+                {doc.stickers.length > 0 && (
+                  <Group label={`On the artboard (${doc.stickers.length})`}>
+                    <div className="st-list">
+                      {doc.stickers.map((st) => <button key={st.uid} className={selSticker === st.uid ? "on" : ""} onClick={() => setSelSticker(st.uid)}>{stickerById(st.kind).name}{st.repeat !== "none" ? ` · ${st.repeat}` : ""}</button>)}
+                    </div>
+                  </Group>
+                )}
+                {(() => {
+                  const st = doc.stickers.find((x) => x.uid === selSticker); if (!st) return null;
+                  const def = stickerById(st.kind);
+                  return (
+                    <div className="card">
+                      <div className="card-h"><b>{def.name}</b>
+                        <span className="row tight">
+                          <button className="ghost small" title="Flip" onClick={() => updSticker(st.uid, { flip: !st.flip })}><FlipHorizontal2 /></button>
+                          <button className="ghost small" title="Duplicate" onClick={() => { const c2 = { ...st, uid: uid(), x: Math.min(95, st.x + 6), y: Math.min(95, st.y + 4) }; commit((d) => ({ ...d, stickers: [...d.stickers, c2] })); setSelSticker(c2.uid); }}><Copy /></button>
+                          <button className="ghost small" title="Remove" onClick={() => { commit((d) => ({ ...d, stickers: d.stickers.filter((x) => x.uid !== st.uid) })); setSelSticker(null); }}><Trash2 /></button>
+                        </span>
+                      </div>
+                      {def.text !== undefined && <textarea rows={2} value={st.text ?? ""} onChange={(e) => updSticker(st.uid, { text: e.target.value.toUpperCase() === e.target.value || def.id === "badge-sugar" ? e.target.value : e.target.value }, `st-t-${st.uid}`)} aria-label="Badge text" />}
+                      <div className="seg small">{(["natural", "flavour", "white", "ink"] as StickerColour[]).map((c) => <button key={c} className={st.colour === c ? "on" : ""} onClick={() => updSticker(st.uid, { colour: c })}>{c === "flavour" ? "Can colour" : c[0].toUpperCase() + c.slice(1)}</button>)}</div>
+                      <Range label="Size" unit="%" min={15} max={400} value={Math.round(st.scale * 100)} onChange={(v) => updSticker(st.uid, { scale: v / 100 }, `st-s-${st.uid}`)} />
+                      <Range label="Rotate" unit="°" min={-180} max={180} value={st.rot} onChange={(v) => updSticker(st.uid, { rot: v }, `st-r-${st.uid}`)} />
+                      <Range label="Opacity" unit="%" min={5} max={100} value={Math.round(st.opacity * 100)} onChange={(v) => updSticker(st.uid, { opacity: v / 100 }, `st-o-${st.uid}`)} />
+                      <div className="gl">Repeat</div>
+                      <div className="seg small">{(["none", "grid", "scatter", "border"] as Repeat[]).map((r) => <button key={r} className={st.repeat === r ? "on" : ""} onClick={() => updSticker(st.uid, { repeat: r, ...(r !== "none" && st.repeat === "none" ? { opacity: Math.min(st.opacity, 0.35), scale: Math.min(st.scale, 0.5) } : {}) })}>{r === "none" ? "Single" : r[0].toUpperCase() + r.slice(1)}</button>)}</div>
+                      {st.repeat !== "none" && <Range label="Density" unit="×" min={0.5} max={2.5} step={0.1} value={st.density} onChange={(v) => updSticker(st.uid, { density: v }, `st-d-${st.uid}`)} />}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+
             {tab === "background" && (
               <>
                 <div className="seg">
@@ -1012,7 +1478,7 @@ export default function Home() {
                       ))}
                     </div>
                     <button className="ghost wide" disabled={doc.carousel.slides.length >= 10} onClick={() => commit((d) => { const s2 = [...d.carousel.slides, { ...d.carousel.slides[d.carousel.slides.length - 1] }]; return applySlide({ ...d, carousel: { ...d.carousel, slides: s2 } }, s2.length - 1); })}>+ Add slide ({doc.carousel.slides.length}/10)</button>
-                    <button className="primary wide" onClick={exportCarousel} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${doc.carousel.slides.length} slides (${doc.format === "jpg" ? "JPG" : "PNG"} zip)`}</button>
+                    <button className="primary wide" onClick={guarded(exportCarousel)} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${doc.carousel.slides.length} slides (${doc.format === "jpg" ? "JPG" : "PNG"} zip)`}</button>
                     <button className="link" onClick={() => commit((d) => ({ ...d, carousel: { ...d.carousel, slides: [], base: undefined } }))}>End carousel</button>
                   </>
                 )}
@@ -1046,14 +1512,36 @@ export default function Home() {
                 <Group label="Format">
                   <div className="seg">{(["png", "jpg", "webp"] as const).map((f) => <button key={f} className={doc.format === f ? "on" : ""} onClick={() => commit((d) => ({ ...d, format: f }))}>{f.toUpperCase()}</button>)}</div>
                 </Group>
-                <button className="primary wide" onClick={exportArt} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${out.w} × ${out.h} ${doc.format.toUpperCase()}`}</button>
-                <button className="ghost wide" onClick={exportAllSizes} disabled={busy}><Download /> Every size: 1:1, 4:5 and 9:16 (zip)</button>
+                <button className="primary wide" onClick={guarded(exportArt)} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${out.w} × ${out.h} ${doc.format.toUpperCase()}`}</button>
+                <button className="ghost wide" onClick={guarded(exportAllSizes)} disabled={busy}><Download /> Every size: 1:1, 4:5 and 9:16 (zip)</button>
+                <Group label="Flavour world series">
+                  <p className="hint">The same composition in each flavour world: colours, set, props, stickers and line swap automatically.</p>
+                  <div className="series">{seriesThumbs.map((u, i) => <img key={i} src={u} alt="" />)}</div>
+                  <label className="chk"><input type="checkbox" checked={seriesSoon} onChange={(e) => setSeriesSoon(e.target.checked)} /> Include FLOW and FLOAT (coming soon)</label>
+                  <button className="ghost wide" onClick={guarded(exportSeries)} disabled={busy}><Download /> Download series (zip)</button>
+                </Group>
+                <button className="link" onClick={() => { const i = checkDoc(doc); setGate({ issues: i, run: () => {} }); }}><ShieldCheck /> Run brand safety check</button>
                 <p className="hint">PNG for crisp text, JPG for the smallest file. Everything on the artboard is exported at full size.</p>
               </>
             )}
           </div>
         </aside>
       </div>
+      {gate && (
+        <div className="modal-bg" onClick={() => setGate(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-h"><b><ShieldCheck /> Brand safety check</b><button className="ghost small" onClick={() => setGate(null)}><X /></button></div>
+            {gate.issues.length === 0 ? <p className="ok"><Check /> All clear: no claims, no dashes, readable text, calm sticker count.</p> : (
+              <ul className="issues">{gate.issues.map((i, n) => <li key={n} className={i.level}><b>{i.level === "stop" ? "Fix" : "Check"}</b> {i.msg}</li>)}</ul>
+            )}
+            <div className="row end">
+              <button className="ghost" onClick={() => setGate(null)}>Go back and fix</button>
+              {gate.issues.length > 0 && <button className="primary" onClick={() => { const r = gate.run; setGate(null); r(); }}>Export anyway</button>}
+            </div>
+          </div>
+        </div>
+      )}
+      {wiz && <WizardModal wiz={wiz} setWiz={setWiz} onFinish={finishWizard} />}
     </main>
   );
 }
@@ -1063,6 +1551,69 @@ function Overlay({ id, t, selected, className, onStart, children }: { id: Overla
     <div className={`ov ${className} ${selected ? "sel" : ""}`} style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%, -50%) scale(${t.scale})` }} onPointerDown={(e) => onStart(e, id, "move")}>
       {children}
       {selected && <button className="handle" aria-label={`Resize ${id}`} style={{ transform: `scale(${1 / t.scale})` }} onPointerDown={(e) => onStart(e, id, "resize")} />}
+    </div>
+  );
+}
+const setPresets: Array<{ name: string; shape: SetShape; props: PropArr; pal: number; two?: boolean; light: "left" | "right"; floor?: number }> = [
+  { name: "Two-block stack", shape: "stack", props: "base", pal: 0, light: "left" },
+  { name: "Hero cube", shape: "cube", props: "both", pal: 0, light: "left" },
+  { name: "Sky steps", shape: "steps", props: "top", pal: 2, two: false, light: "left" },
+  { name: "Arch niche", shape: "arch", props: "base", pal: 1, light: "right" },
+  { name: "Pillar", shape: "cylinder", props: "base", pal: 3, light: "left" },
+  { name: "Low slab", shape: "slab", props: "scatter", pal: 1, two: true, light: "left", floor: 80 },
+];
+function SetThumb({ s }: { s: SetSettings }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current; if (!c) return; c.width = 120; c.height = 120;
+    const x = c.getContext("2d")!; drawWorld(x, 120, 120, s);
+    const ss = { ...s, floor: 80 };
+    const g = drawSet(x, 120, 120, ss, 60, 14, 38);
+    x.fillStyle = "#f4f4f4"; x.beginPath(); x.roundRect(53, g.canBase - 38, 14, 38, 3); x.fill();
+  }, [s]);
+  return <canvas ref={ref} className="thumb" />;
+}
+function WizardModal({ wiz, setWiz, onFinish }: { wiz: Wizard; setWiz: (w: Wizard | null) => void; onFinish: (w: Wizard) => void }) {
+  const steps = ["Goal", "Format", "Style", "Layout", "Line", "Finish"];
+  const up = (v: Partial<Wizard>) => setWiz({ ...wiz, ...v });
+  const g = groupForProduct(wiz.product);
+  const lineOptions = (() => {
+    const all = wiz.goal === "brand" || wiz.goal === "awareness" ? [...headerLines.Brand.slice(0, 4), ...headerLines[g].slice(0, 4)] : wiz.goal === "engage" ? [...headerLines[g], ...headerLines.Brand].filter((l) => /[?!]|YOU|YOUR/.test(l)).slice(0, 8) : headerLines[g].slice(0, 8);
+    return all.length ? all : headerLines[g].slice(0, 8);
+  })();
+  const styleOk = (k: string) => k !== "reveal" || wiz.product === "flourish";
+  return (
+    <div className="modal-bg">
+      <div className="modal wiz">
+        <div className="modal-h"><b><WandSparkles /> Create a post</b><button className="ghost small" onClick={() => setWiz(null)}><X /></button></div>
+        <ol className="wiz-steps">{steps.map((st, i) => <li key={st} className={i === wiz.step ? "on" : i < wiz.step ? "done" : ""} onClick={() => i < wiz.step && up({ step: i })}><span>{i + 1}</span>{st}</li>)}</ol>
+        <div className="wiz-body">
+          {wiz.step === 0 && (<>
+            <div className="gl">Which can?</div>
+            <div className="seg">{(["flourish", "focus", "flow", "float"] as ProductKey[]).map((k) => <button key={k} className={wiz.product === k ? "on" : ""} onClick={() => up({ product: k, line: headerLines[groupForProduct(k)][0], style: wiz.style === "reveal" && k !== "flourish" ? "plinth" : wiz.style })}>{products[k].name}{products[k].soon ? " (soon)" : ""}</button>)}</div>
+            <div className="gl">What is the post for?</div>
+            <div className="choice">{goals.map(([k, l, h]) => <button key={k} className={wiz.goal === k ? "on" : ""} onClick={() => up({ goal: k, format: k === "story" ? "carousel" : wiz.format })}><b>{l}</b><small>{h}</small></button>)}</div>
+          </>)}
+          {wiz.step === 1 && <div className="choice">{formats.map(([k, l]) => <button key={k} className={wiz.format === k ? "on" : ""} onClick={() => up({ format: k })}><b>{l}</b><small>{k === "reel" ? "Looping MP4 from the Motion tab" : k === "carousel" ? (wiz.product === "flourish" || wiz.product === "focus" ? "Ingredient story starter" : "Starter available for FLOURISH and FOCUS") : outputs.find((o) => o.id === k)?.w + " × " + outputs.find((o) => o.id === k)?.h}</small></button>)}</div>}
+          {wiz.step === 2 && <div className="choice">{guidedStyles.map(([k, l, h]) => <button key={k} disabled={!styleOk(k)} className={wiz.style === k ? "on" : ""} onClick={() => up({ style: k })}><b>{l}</b><small>{styleOk(k) ? h : "FLOURISH only: it is the can that changes colour."}</small></button>)}</div>}
+          {wiz.step === 3 && <div className="choice">{layoutKinds.map(([k, l]) => <button key={k} className={wiz.layout === k ? "on" : ""} onClick={() => up({ layout: k })}><b>{l}</b><small>{k === "centre" ? "Logo, line, can on the set" : k === "poster" ? "Big line, small can to the side" : "Can on the left, line on the right"}</small></button>)}</div>}
+          {wiz.step === 4 && (<>
+            <div className="choice lines">{lineOptions.map((l) => <button key={l} className={wiz.line === l ? "on" : ""} onClick={() => up({ line: l })}><b>{l.replace(/\n/g, " ")}</b></button>)}</div>
+            <button className="link" onClick={() => up({ line: headerLines[g][Math.floor(Math.random() * headerLines[g].length)] })}><Shuffle /> Surprise me</button>
+          </>)}
+          {wiz.step === 5 && (<>
+            <label className="chk"><input type="checkbox" checked={wiz.props} onChange={(e) => up({ props: e.target.checked })} /> Real ingredients at the base ({botanicalsFor(wiz.product).map((k) => stickerById(k).name.toLowerCase()).join(", ")})</label>
+            <label className="chk"><input type="checkbox" checked={wiz.stickers} onChange={(e) => up({ stickers: e.target.checked })} /> One or two matching stickers</label>
+            <div className="gl">Logo</div>
+            <div className="seg">{(["wordmark", "lockup", "icon"] as const).map((k) => <button key={k} className={wiz.logo === k ? "on" : ""} onClick={() => up({ logo: k })}>{k[0].toUpperCase() + k.slice(1)}</button>)}</div>
+            <p className="hint">The brand safety check runs on the result and again before every export.</p>
+          </>)}
+        </div>
+        <div className="row end">
+          {wiz.step > 0 && <button className="ghost" onClick={() => up({ step: wiz.step - 1 })}><ArrowBack /> Back</button>}
+          {wiz.step < 5 ? <button className="primary" onClick={() => up({ step: wiz.step + 1 })}>Next <ArrowRight /></button> : <button className="primary" onClick={() => onFinish(wiz)}><Sparkles /> Create post</button>}
+        </div>
+      </div>
     </div>
   );
 }
