@@ -1,6 +1,6 @@
 // Built-in background library. Plates contain NO can; the approved can is placed as its own layer.
 // fg: optional transparent PNG drawn just above the can (flowers that wrap in front).
-export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number };
+export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number };
 export const scenes: Scene[] = [
  {
   "id": "flourish-collar",
@@ -237,5 +237,75 @@ export const scenes: Scene[] = [
   },
   "light": "left",
   "kb": 229
+ },
+ {
+  "id": "flourish-gallery",
+  "group": "Gallery",
+  "flavour": "flourish",
+  "src": "/library/flourish-gallery.jpg",
+  "fg": null,
+  "can": {
+   "x": 76.2,
+   "y": 44.4,
+   "scale": 0.461
+  },
+  "light": "left",
+  "kb": 262
+ },
+ {
+  "id": "focus-gallery",
+  "group": "Gallery",
+  "flavour": "focus",
+  "src": "/library/focus-gallery.jpg",
+  "fg": null,
+  "can": {
+   "x": 72.9,
+   "y": 38.3,
+   "scale": 0.49
+  },
+  "light": "left",
+  "kb": 291
+ },
+ {
+  "id": "flow-gallery",
+  "group": "Gallery",
+  "flavour": "flow",
+  "src": "/library/flow-gallery.jpg",
+  "fg": null,
+  "can": {
+   "x": 75.9,
+   "y": 41.0,
+   "scale": 0.461
+  },
+  "light": "left",
+  "kb": 295
+ },
+ {
+  "id": "float-gallery",
+  "group": "Gallery",
+  "flavour": "float",
+  "src": "/library/float-gallery.jpg",
+  "fg": null,
+  "can": {
+   "x": 77.0,
+   "y": 43.7,
+   "scale": 0.437
+  },
+  "light": "left",
+  "kb": 279
+ },
+ {
+  "id": "lineup-gallery",
+  "group": "Gallery",
+  "flavour": "lineup",
+  "src": "/library/lineup-gallery.jpg",
+  "fg": null,
+  "can": {
+   "x": 50.3,
+   "y": 60.7,
+   "scale": 0.689
+  },
+  "light": "left",
+  "kb": 371
  }
 ];
