@@ -181,5 +181,61 @@ export const scenes: Scene[] = [
   "can": null,
   "light": "left",
   "kb": 133
+ },
+ {
+  "id": "flourish-vessel",
+  "group": "Vessel",
+  "flavour": "flourish",
+  "src": "/library/flourish-vessel.jpg",
+  "fg": null,
+  "can": {
+   "x": 78.1,
+   "y": 62.2,
+   "scale": 0.567
+  },
+  "light": "left",
+  "kb": 218
+ },
+ {
+  "id": "focus-vessel",
+  "group": "Vessel",
+  "flavour": "focus",
+  "src": "/library/focus-vessel.jpg",
+  "fg": null,
+  "can": {
+   "x": 79.4,
+   "y": 65.6,
+   "scale": 0.59
+  },
+  "light": "left",
+  "kb": 209
+ },
+ {
+  "id": "flow-vessel",
+  "group": "Vessel",
+  "flavour": "flow",
+  "src": "/library/flow-vessel.jpg",
+  "fg": null,
+  "can": {
+   "x": 76.8,
+   "y": 65.0,
+   "scale": 0.543
+  },
+  "light": "left",
+  "kb": 222
+ },
+ {
+  "id": "float-vessel",
+  "group": "Vessel",
+  "flavour": "float",
+  "src": "/library/float-vessel.jpg",
+  "fg": null,
+  "can": {
+   "x": 79.4,
+   "y": 64.3,
+   "scale": 0.567
+  },
+  "light": "left",
+  "kb": 229
  }
 ];
