@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { scenes } from "@/lib/scenes";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight, Check, ChevronDown, ChevronUp, Download, Eye, EyeOff, ImagePlus, Layers3, LockKeyhole, Redo2,
   RefreshCw, RotateCcw, Sparkles, Shuffle, Lock, LockOpen, FlipHorizontal2, Copy, Trash2, ShieldCheck, X, ArrowRight, ArrowLeft as ArrowBack, Undo2, Upload, WandSparkles, AlignLeft, AlignCenter, ExternalLink,
@@ -86,6 +87,7 @@ type Doc = {
   bg: BgSettings;
   bgPreset: string | null;
   image: string | null;
+  fg?: string | null;
   layers: { background: boolean; wash: boolean; radial: boolean; product: boolean; shadow: boolean; icon: boolean; wordmark: boolean; lockup: boolean; header: boolean; sub: boolean };
   t: Record<OverlayKey, T>;
   header: { text: string; caps: boolean; size: number; align: Align };
@@ -434,7 +436,7 @@ function useHistory(initial: Doc) {
 export default function Home() {
   const { doc, commit, undo, redo, replace, canUndo, canRedo } = useHistory(initialDoc);
   const [tab, setTab] = useState<Tab>("background");
-  const [bgMode, setBgMode] = useState<"create" | "upload" | "ai">("create");
+  const [bgMode, setBgMode] = useState<"create" | "library" | "upload" | "ai">("create");
   const [copyTab, setCopyTab] = useState<CopyGroup>("FLOURISH");
   const [selected, setSelected] = useState<OverlayKey | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -703,7 +705,7 @@ export default function Home() {
   function loadFile(f?: Blob | null) {
     if (!f || !f.type.startsWith("image/")) return;
     const r = new FileReader();
-    r.onload = () => { commit((d) => ({ ...d, image: String(r.result), bgSource: "image", aligned: null, layers: { ...d.layers, background: true } })); setNotice("Image set as the background."); };
+    r.onload = () => { commit((d) => ({ ...d, image: String(r.result), fg: null, bgSource: "image", aligned: null, layers: { ...d.layers, background: true } })); setNotice("Image set as the background."); };
     r.readAsDataURL(f);
   }
   const remixDirection = `${remixParts.light[remix % 5]}, ${remixParts.lens[(remix * 2) % 5]}, ${remixParts.material[(remix * 3) % 5]}`;
@@ -716,7 +718,7 @@ export default function Home() {
       const res = await fetch("/api/generate-background", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt, size, apiKey: apiKey.trim() || undefined }) });
       const result = (await res.json()) as { error?: string; image?: string };
       if (!res.ok) throw new Error(result.error || "Background generation failed.");
-      commit((d) => ({ ...d, image: `data:image/png;base64,${result.image}`, bgSource: "image", aligned: null, layers: { ...d.layers, background: true } }));
+      commit((d) => ({ ...d, image: `data:image/png;base64,${result.image}`, fg: null, bgSource: "image", aligned: null, layers: { ...d.layers, background: true } }));
       setNotice("AI background ready.");
     } catch (e) { setNotice(e instanceof Error ? e.message : "Background generation failed."); }
     finally { setIsGenerating(false); }
@@ -811,6 +813,7 @@ export default function Home() {
           const img = await loadImg(d.product === "lineup" ? "/assets/can-lineup.png" : `/assets/can-${d.product}.png`);
           const b = canBox(W, H, d);
           c.save(); c.filter = d.aligned ?? "none"; c.drawImage(img, b.cx - b.w / 2, b.cy - b.h / 2, b.w, b.h); c.restore();
+          if (d.fg && d.bgSource === "image") { const f = await loadImg(d.fg); const cover = Math.max(W / f.width, H / f.height); c.drawImage(f, (W - f.width * cover) / 2, (H - f.height * cover) / 2, f.width * cover, f.height * cover); }
         } else if (k === "icon" || k === "wordmark") {
           const m = k === "icon" ? ICON : WORD, w = W * (k === "icon" ? iconW : wordW) * t.scale, h = w / m.a;
           await drawMark(m.src, cx - w / 2, cy - h / 2, w, h);
@@ -1132,7 +1135,7 @@ export default function Home() {
           <div className="shell" ref={shellRef} onPointerDown={() => { setSelected(null); setSelSticker(null); }}>
             <div className="artboard" ref={boardRef} style={{ width: board.w, height: board.h }}>
               <canvas ref={baseRef} className="base" />
-              {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && renderOverlay(k))}
+              {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && (k === "product" && doc.fg && doc.bgSource === "image" ? <Fragment key={k}>{renderOverlay(k)}<img key="fg" src={doc.fg} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /></Fragment> : renderOverlay(k)))}
               {doc.stickers.filter((x) => x.repeat === "none").map(renderSticker)}
               {doc.output === "ig-story" && showSafe && (
                 <>
@@ -1254,7 +1257,7 @@ export default function Home() {
             {tab === "background" && (
               <>
                 <div className="seg">
-                  {([["create", "Create"], ["upload", "Upload"], ["ai", "AI"]] as const).map(([k, l]) => <button key={k} className={bgMode === k ? "on" : ""} onClick={() => setBgMode(k)}>{l}</button>)}
+                  {([["create", "Create"], ["library", "Library"], ["upload", "Upload"], ["ai", "AI"]] as const).map(([k, l]) => <button key={k} className={bgMode === k ? "on" : ""} onClick={() => setBgMode(k)}>{l}</button>)}
                 </div>
                 {bgMode === "create" && (
                   <>
@@ -1300,6 +1303,33 @@ export default function Home() {
                     <Range label="Grain" unit="%" min={0} max={100} value={doc.bg.grain} onChange={(v) => setBg({ grain: v }, "grain")} />
                     <Range label="Vignette" unit="%" min={0} max={100} value={doc.bg.vignette} onChange={(v) => setBg({ vignette: v }, "vig")} />
                     <p className="hint">The can shadow follows the light. Switch it off in Layers if you don&apos;t want it.</p>
+                  </>
+                )}
+                {bgMode === "library" && (
+                  <>
+                    <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Couture scenes also set the can position.</p>
+                    {["Couture", "Plinth", "Cascade", "Arch"].map((g) => {
+                      const list = scenes.filter((x) => x.group === g).sort((a, b) => (a.flavour === doc.product ? -1 : 0) - (b.flavour === doc.product ? -1 : 0));
+                      if (!list.length) return null;
+                      return (
+                        <div key={g}>
+                          <h4 style={{ margin: "10px 0 6px", fontSize: 12, textTransform: "uppercase", letterSpacing: ".08em", opacity: 0.7 }}>{g}</h4>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                            {list.map((sc) => (
+                              <button key={sc.id} title={sc.id} className={doc.image === sc.src ? "on" : ""} style={{ padding: 0, aspectRatio: "4 / 5", borderRadius: 8, overflow: "hidden", background: `center/cover url(${sc.src})`, outline: doc.image === sc.src ? "2px solid #0066FF" : "none" }}
+                                onClick={() => {
+                                  commit((d) => ({ ...d, image: sc.src, fg: sc.fg, bgSource: "image", aligned: null, product: sc.flavour, set: { ...d.set, on: false },
+                                    sub: d.sub.custom ? d.sub : { ...d.sub, text: flavourText(sc.flavour) },
+                                    layers: { ...d.layers, background: true, product: true },
+                                    t: sc.can ? { ...d.t, product: { ...d.t.product, ...sc.can } } : d.t }));
+                                  setCopyTab(groupForProduct(sc.flavour));
+                                  setNotice("Scene set. The can is the real approved artwork and stays movable.");
+                                }} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </>
                 )}
                 {bgMode === "upload" && (
