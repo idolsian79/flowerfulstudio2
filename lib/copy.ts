@@ -57,3 +57,28 @@ export const subLines: Record<CopyGroup, string[]> = {
   FOCUS: ["Saffron & cardamom", "Saffron threads, cardamom, sparkle", "Warm spice, served cold", "Golden by nature"],
   Brand: ["Sparkling botanical refresher", "Brewed from real blooms"],
 };
+
+// Carousel starters: 5-slide ingredient stories. Ingredient facts only, no health claims.
+export type Slide = { header: string; sub: string; can: boolean };
+export const storyTemplates: Record<"flourish" | "focus", { name: string; slides: Slide[] }> = {
+  flourish: {
+    name: "FLOURISH ingredient story",
+    slides: [
+      { header: "MEET\nFLOURISH", sub: "Butterfly pea & raspberry", can: true },
+      { header: "IT STARTS\nWITH A BLUE FLOWER", sub: "Butterfly pea, picked for its colour", can: false },
+      { header: "PETALS,\nSTEEPED SLOWLY", sub: "Brewed from real blooms", can: false },
+      { header: "THEN COMES\nTHE RASPBERRY", sub: "Bright, tart, properly fruity", can: false },
+      { header: "BLUE IS THE\nNEW BLACK", sub: "Lightly sparkling botanical soda", can: true },
+    ],
+  },
+  focus: {
+    name: "FOCUS ingredient story",
+    slides: [
+      { header: "MEET\nFOCUS", sub: "Saffron & cardamom", can: true },
+      { header: "SAFFRON,\nTHREAD BY THREAD", sub: "Golden threads, gently steeped", can: false },
+      { header: "CARDAMOM\nBRINGS THE WARMTH", sub: "Green pods, softly spiced", can: false },
+      { header: "SERVED\nICE COLD", sub: "Lightly sparkling botanical soda", can: false },
+      { header: "WARM SPICE.\nCOOL HEAD.", sub: "Saffron & cardamom", can: true },
+    ],
+  },
+};

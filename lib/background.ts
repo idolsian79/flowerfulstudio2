@@ -71,11 +71,12 @@ function grainTile(size = 128) {
 }
 let tile: HTMLCanvasElement | null = null;
 
-export function drawBackground(c: CanvasRenderingContext2D, w: number, h: number, s: BgSettings) {
+export function drawBackground(c: CanvasRenderingContext2D, w: number, h: number, s: BgSettings, lp?: [number, number]) {
+  const LP = (d: LightDir) => lp ?? lightPos(d);
   c.save();
   if (s.type === "linear") linear(c, w, h, s.angle, s.c1, s.c2);
   else if (s.type === "radial") {
-    const [lx, ly] = lightPos(s.light);
+    const [lx, ly] = LP(s.light);
     const g = c.createRadialGradient(w * (0.5 + (lx - 0.5) * 0.5), h * (0.45 + (ly - 0.4) * 0.5), 0, w / 2, h / 2, Math.hypot(w, h) * 0.62);
     g.addColorStop(0, s.c1);
     g.addColorStop(1, s.c2);
@@ -97,7 +98,7 @@ export function drawBackground(c: CanvasRenderingContext2D, w: number, h: number
     c.fillRect(0, hy - h * 0.012, w, h * 0.032);
   }
   if (s.lightStrength > 0) {
-    const [lx, ly] = lightPos(s.light);
+    const [lx, ly] = LP(s.light);
     const r = Math.max(w, h) * 0.85;
     const g = c.createRadialGradient(w * lx, h * ly, 0, w * lx, h * ly, r);
     const a = (s.lightStrength / 100) * 0.55;
@@ -134,8 +135,8 @@ export function drawBackground(c: CanvasRenderingContext2D, w: number, h: number
 }
 
 // soft contact shadow under the can, thrown away from the light
-export function drawCanShadow(c: CanvasRenderingContext2D, cx: number, baseY: number, canW: number, s: BgSettings | null, strength = 1) {
-  const [lx] = s ? lightPos(s.light) : [0.5];
+export function drawCanShadow(c: CanvasRenderingContext2D, cx: number, baseY: number, canW: number, s: BgSettings | null, strength = 1, lp?: [number, number]) {
+  const [lx] = lp ?? (s ? lightPos(s.light) : [0.5]);
   const off = (0.5 - lx) * canW * 0.9;
   c.save();
   c.translate(cx + off * 0.5, baseY);

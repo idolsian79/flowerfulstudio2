@@ -5,7 +5,8 @@ import {
   RefreshCw, RotateCcw, Sparkles, Undo2, Upload, WandSparkles, AlignLeft, AlignCenter, ExternalLink,
 } from "lucide-react";
 import { BgSettings, GradientType, LightDir, bgPresets, defaultPresetFor, drawBackground, drawCanShadow } from "@/lib/background";
-import { CopyGroup, copyGroups, groupForProduct, headerLines, originalCount, subLines } from "@/lib/copy";
+import { CopyGroup, Slide, copyGroups, groupForProduct, headerLines, originalCount, storyTemplates, subLines } from "@/lib/copy";
+import { makeZip } from "@/lib/zip";
 
 const products = {
   flourish: { name: "FLOURISH", flavour: "Butterfly Pea + Raspberry", color: "#0066FF", radial: "/assets/radial-flourish.jpg", soon: false },
@@ -89,6 +90,7 @@ type Doc = {
   markColour: MarkColour;
   lockup: { layout: "left" | "above"; spacing: number };
   order: OverlayKey[];
+  carousel: { slides: Slide[]; active: number; size: "ig-square" | "ig-portrait"; base?: { t: Doc["t"]; size: number } };
   aligned: string | null;
   output: string;
   format: "png" | "jpg" | "webp";
@@ -116,6 +118,7 @@ const initialDoc: Doc = {
   markColour: "white",
   lockup: { layout: "left", spacing: 22 },
   order: defaultOrder,
+  carousel: { slides: [], active: 0, size: "ig-square" },
   aligned: null,
   output: "ig-square",
   format: "png",
@@ -135,10 +138,64 @@ const fixedLayers: Array<{ key: keyof Doc["layers"]; label: string; tab: Tab }> 
   { key: "wash", label: "Colour wash", tab: "brand" },
   { key: "background", label: "Background", tab: "background" },
 ];
-type Tab = "background" | "can" | "text" | "brand" | "export";
-const tabs: Array<[Tab, string]> = [["background", "Background"], ["can", "Can"], ["text", "Text"], ["brand", "Brand"], ["export", "Export"]];
+type Tab = "background" | "can" | "text" | "brand" | "carousel" | "motion" | "export";
+const tabs: Array<[Tab, string]> = [["background", "Background"], ["can", "Can"], ["text", "Text"], ["brand", "Brand"], ["carousel", "Carousel"], ["motion", "Motion"], ["export", "Export"]];
 
-const loadImg = (src: string) => new Promise<HTMLImageElement>((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
+const imgCache = new Map<string, Promise<HTMLImageElement>>();
+const loadImg = (src: string) => {
+  let pr = imgCache.get(src);
+  if (!pr) {
+    pr = new Promise<HTMLImageElement>((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = (e) => { imgCache.delete(src); no(e); }; i.src = src; });
+    if (imgCache.size > 40) imgCache.clear();
+    imgCache.set(src, pr);
+  }
+  return pr;
+};
+type MotionKind = "drift" | "sweep" | "petals" | "typeon";
+type Anim = { kind: MotionKind; t: number };
+const motionPresets: Array<[MotionKind, string, string]> = [
+  ["drift", "Gradient drift", "Colours breathe and rotate slowly"],
+  ["sweep", "Light sweep", "Light travels left to right, the can shadow follows"],
+  ["petals", "Drifting petals", "Flower artwork floats gently through the frame"],
+  ["typeon", "Header type-on", "The header writes itself, then holds"],
+];
+const STORY_TOP = 250 / 1920, STORY_BOTTOM = 340 / 1920;
+const safeBand = (id: string) => (id === "ig-story" ? [STORY_TOP * 100, 100 - STORY_BOTTOM * 100] : [0, 100]);
+// move a layout designed at one size onto another, keeping text and logos inside Story safe zones
+function reflow(d: Doc, fromId: string, toId: string): Doc {
+  if (fromId === toId) return d;
+  const from = outputs.find((o) => o.id === fromId)!, to = outputs.find((o) => o.id === toId)!;
+  const [f0, f1] = safeBand(fromId), [t0, t1] = safeBand(toId);
+  const t = { ...d.t };
+  (Object.keys(t) as OverlayKey[]).forEach((k) => {
+    const n = (t[k].y - f0) / (f1 - f0);
+    let y = t0 + n * (t1 - t0);
+    if (k !== "product") y = Math.max(t0 + 2, Math.min(t1 - 2, y));
+    t[k] = { ...t[k], y };
+  });
+  // can height is a share of artboard height, so keep its pixel size similar across ratios
+  const k = Math.pow((from.h / from.w) / (to.h / to.w), 0.7);
+  t.product = { ...t.product, scale: t.product.scale * k };
+  if (toId === "ig-story") {
+    const half = (68 * t.product.scale) / 2, bottom = t1 - 1;
+    if (t.product.y + half > bottom) t.product.y = bottom - half;
+  }
+  return { ...d, output: toId, t };
+}
+function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 8000);
+}
+const toBlob = (cv: HTMLCanvasElement, fmt: string) => new Promise<Blob>((ok, no) => cv.toBlob((b) => (b ? ok(b) : no(new Error())), fmt === "jpg" ? "image/jpeg" : `image/${fmt}`, fmt === "png" ? undefined : 0.94));
+function slideDoc(d: Doc, sl: Slide): Doc {
+  const t = { ...d.t };
+  if (!sl.can) {
+    const n = sl.header.split("\n").length, [a, b] = safeBand(d.output), mid = (a + b) / 2;
+    t.header = { ...t.header, y: mid - 4 }; t.sub = { ...t.sub, y: mid - 4 + n * 4.6 + 4 };
+  }
+  return { ...d, t, header: { ...d.header, text: sl.header, size: sl.can ? d.header.size : d.header.size * 1.15 }, sub: { ...d.sub, text: sl.sub, custom: true }, layers: { ...d.layers, product: sl.can } };
+}
 const linesOf = (text: string, caps: boolean) => (caps ? text.toUpperCase() : text).split("\n");
 const flavourText = (p: ProductKey) => products[p].flavour.replace(" + ", " & ");
 
@@ -171,6 +228,12 @@ export default function Home() {
   const [canAspect, setCanAspect] = useState<Record<string, number>>({});
   const [board, setBoard] = useState({ w: 600, h: 600 });
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [motion, setMotion] = useState<MotionKind>("drift");
+  const [motionSecs, setMotionSecs] = useState(7);
+  const [showSafe, setShowSafe] = useState(true);
+  const [motionPreview, setMotionPreview] = useState(false);
+  const [thumbs, setThumbs] = useState<string[]>([]);
   // AI (secondary) state is per session only
   const [theme, setTheme] = useState<ThemeKey>("Botanical Couture");
   const [subtheme, setSubtheme] = useState<string>(themes["Botanical Couture"][0]);
@@ -192,7 +255,7 @@ export default function Home() {
       if (raw) {
         const saved = JSON.parse(raw) as Partial<Doc>;
         const order = saved.order && defaultOrder.every((k) => saved.order!.includes(k)) ? saved.order.filter((k) => defaultOrder.includes(k)) : defaultOrder;
-        replace({ ...initialDoc, ...saved, order, lockup: { ...initialDoc.lockup, ...saved.lockup }, layers: { ...initialDoc.layers, ...saved.layers }, t: { ...initialDoc.t, ...saved.t } });
+        replace({ ...initialDoc, ...saved, order, carousel: { ...initialDoc.carousel, ...saved.carousel }, lockup: { ...initialDoc.lockup, ...saved.lockup }, layers: { ...initialDoc.layers, ...saved.layers }, t: { ...initialDoc.t, ...saved.t } });
         if (saved.product) setCopyTab(groupForProduct(saved.product));
       }
     } catch {}
@@ -261,20 +324,38 @@ export default function Home() {
   }, [canAspect]);
 
   // background base: gradient or image, plus can shadow. Same code paints preview and export.
-  const paintBase = useCallback(async (c: CanvasRenderingContext2D, W: number, H: number, d: Doc) => {
+  const paintBase = useCallback(async (c: CanvasRenderingContext2D, W: number, H: number, d: Doc, anim?: Anim) => {
+    const TAU = Math.PI * 2;
+    let bg = d.bg, lp: [number, number] | undefined;
+    if (anim?.kind === "drift") bg = { ...bg, angle: bg.angle + 16 * Math.sin(TAU * anim.t), lightStrength: bg.lightStrength * (0.85 + 0.15 * Math.cos(TAU * anim.t)) };
+    if (anim?.kind === "sweep") lp = [0.5 - 0.46 * Math.cos(TAU * anim.t), 0.22 + 0.1 * Math.sin(TAU * anim.t)];
     if (d.layers.background) {
       if (d.bgSource === "image" && d.image) {
         const bg = await loadImg(d.image);
         const cover = Math.max(W / bg.width, H / bg.height);
         c.drawImage(bg, (W - bg.width * cover) / 2, (H - bg.height * cover) / 2, bg.width * cover, bg.height * cover);
-      } else drawBackground(c, W, H, d.bg);
+      } else drawBackground(c, W, H, bg, lp);
     }
     if (d.layers.wash) {
       c.save(); c.globalAlpha = 0.52; c.globalCompositeOperation = "color"; c.fillStyle = products[d.product].color; c.fillRect(0, 0, W, H); c.restore();
     }
+    if (anim?.kind === "petals" && d.product !== "lineup") {
+      const r = await loadImg(products[d.product].radial);
+      c.save(); c.globalCompositeOperation = "multiply";
+      for (let i = 0; i < 9; i++) {
+        const seed = (i * 0.618) % 1, size = W * (0.07 + 0.06 * ((i * 0.37) % 1));
+        const y = (((seed + anim.t) % 1) * 1.3 - 0.15) * H;
+        const x = W * (0.08 + 0.84 * ((i * 0.29 + 0.1) % 1)) + Math.sin(TAU * (anim.t * 2 + seed)) * W * 0.03;
+        c.globalAlpha = 0.28 + 0.2 * ((i * 0.53) % 1);
+        c.translate(x, y); c.rotate(TAU * (anim.t + seed) * (i % 2 ? 1 : -1) * 0.5);
+        c.drawImage(r, -size / 2, -size / 2, size, (size * r.height) / r.width);
+        c.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      c.restore();
+    }
     if (d.layers.product && d.layers.shadow) {
       const b = canBox(W, H, d);
-      drawCanShadow(c, b.cx, b.cy + b.h / 2 - b.h * 0.012, d.product === "lineup" ? b.w * 0.8 : b.w, d.bgSource === "create" ? d.bg : null);
+      drawCanShadow(c, b.cx, b.cy + b.h / 2 - b.h * 0.012, d.product === "lineup" ? b.w * 0.8 : b.w, d.bgSource === "create" ? d.bg : null, 1, lp ?? (d.bgSource === "image" ? undefined : undefined));
     }
   }, [canBox]);
 
@@ -294,6 +375,38 @@ export default function Home() {
     return () => { live = false; };
   }, [doc, board, paintBase]);
 
+  // carousel thumbnails
+  useEffect(() => {
+    if (tab !== "carousel" || !carouselOn) return;
+    let dead = false;
+    const id = setTimeout(async () => {
+      await fontsReady();
+      const cb = doc.carousel.base ?? { t: doc.t, size: doc.header.size };
+      const base = { ...doc, t: cb.t, header: { ...doc.header, size: cb.size } };
+      const o = outputs.find((x) => x.id === doc.output)!, W = 180, H = Math.round((180 * o.h) / o.w), urls: string[] = [];
+      for (const sl of doc.carousel.slides) { const cv = await renderToCanvas({ ...slideDoc(base, sl), format: "jpg" }, W, H); urls.push(cv.toDataURL("image/jpeg", 0.8)); }
+      if (!dead) setThumbs(urls);
+    }, 350);
+    return () => { dead = true; clearTimeout(id); };
+  }, [doc, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  // live motion preview
+  const motionRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (tab !== "motion" || !motionPreview) return;
+    const cv = motionRef.current; if (!cv) return;
+    const W = 300, H = Math.round((300 * out.h) / out.w); cv.width = W; cv.height = H;
+    const c = cv.getContext("2d")!, buf = document.createElement("canvas"); buf.width = W; buf.height = H;
+    const bc = buf.getContext("2d")!; let dead = false; const start = performance.now();
+    (async () => {
+      await fontsReady();
+      while (!dead) {
+        const t = ((performance.now() - start) % (motionSecs * 1000)) / (motionSecs * 1000);
+        bc.clearRect(0, 0, W, H); await renderDoc(bc, W, H, doc, { kind: motion, t }); c.drawImage(buf, 0, 0);
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+      }
+    })();
+    return () => { dead = true; };
+  }, [tab, motionPreview, motion, motionSecs, doc, out]); // eslint-disable-line react-hooks/exhaustive-deps
   // actions
   const setT = (k: OverlayKey, v: Partial<T>, key = "t-" + k) => commit((d) => ({ ...d, t: { ...d.t, [k]: { ...d.t[k], ...v } } }), key);
   const setBg = (v: Partial<BgSettings>, key: string) => commit((d) => ({ ...d, bg: { ...d.bg, ...v }, bgPreset: null, bgSource: "create", layers: { ...d.layers, background: true } }), key);
@@ -368,15 +481,9 @@ export default function Home() {
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   }
 
-  async function exportArt() {
-    setBusy(true);
-    try {
-      await Promise.all([document.fonts.load(`500 40px Fredoka`), document.fonts.load(`600 20px Inter`)]);
-      const W = out.w, H = out.h, d = doc;
-      const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
-      const c = cv.getContext("2d")!;
+  const renderDoc = async (c: CanvasRenderingContext2D, W: number, H: number, d: Doc, anim?: Anim) => {
       if (d.format === "jpg") { c.fillStyle = "#fff"; c.fillRect(0, 0, W, H); }
-      await paintBase(c, W, H, d);
+      await paintBase(c, W, H, d, anim);
       const sku = products[d.product].color;
       const drawMark = async (src: string, x: number, y: number, w: number, h: number) => {
         const img = await loadImg(src);
@@ -395,10 +502,16 @@ export default function Home() {
       };
       const drawText = (k: "header" | "sub") => {
         const cfg = d[k], t = d.t[k];
-        const lines = linesOf(cfg.text, cfg.caps), fs = (cfg.size / 100) * W * t.scale;
+        let lines = linesOf(cfg.text, cfg.caps);
+        const fs = (cfg.size / 100) * W * t.scale;
         const lh = fs * (k === "header" ? 1.02 : 1.3), boxW = W * (k === "header" ? 0.86 : 0.76) * t.scale;
         const cx = (W * t.x) / 100, top = (H * t.y) / 100 - (lines.length * lh) / 2;
+        if (k === "header" && anim?.kind === "typeon") {
+          const total = lines.join("").length, shown = Math.floor(total * Math.min(1, anim.t / 0.45));
+          let left = shown; lines = lines.map((ln) => { const s2 = ln.slice(0, Math.max(0, left)); left -= ln.length; return s2; });
+        }
         c.save();
+        if (anim?.kind === "typeon") c.globalAlpha = anim.t > 0.9 ? (1 - anim.t) / 0.1 : 1;
         c.fillStyle = toneHex[d.tone];
         c.font = k === "header" ? `500 ${fs}px Fredoka` : `600 ${fs}px Inter`;
         (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = k === "sub" && cfg.caps ? `${fs * 0.16}px` : k === "header" ? `${fs * -0.01}px` : "0px";
@@ -427,15 +540,118 @@ export default function Home() {
           await drawMark(WORD.src, x0 + g.word.x * s2, y0 + g.word.y * s2, g.word.w * s2, g.word.h * s2);
         } else if (k === "header" || k === "sub") drawText(k);
       }
-      const mime = d.format === "jpg" ? "image/jpeg" : `image/${d.format}`;
-      const blob = await new Promise<Blob>((ok, no) => cv.toBlob((b) => (b ? ok(b) : no(new Error())), mime, d.format === "png" ? undefined : 0.94));
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `flowerful-${d.product}-${W}x${H}.${d.format}`; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      setNotice(`Downloaded ${W} × ${H} ${d.format.toUpperCase()} (${Math.round(blob.size / 1024)} KB).`);
+  };
+  const fontsReady = () => Promise.all([document.fonts.load(`500 40px Fredoka`), document.fonts.load(`600 20px Inter`)]);
+  const renderToCanvas = async (d: Doc, W: number, H: number) => {
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    await renderDoc(cv.getContext("2d")!, W, H, d);
+    return cv;
+  };
+  async function exportArt() {
+    setBusy(true);
+    try {
+      await fontsReady();
+      const cv = await renderToCanvas(doc, out.w, out.h), blob = await toBlob(cv, doc.format);
+      downloadBlob(blob, `flowerful-${doc.product}-${out.w}x${out.h}.${doc.format}`);
+      setNotice(`Downloaded ${out.w} × ${out.h} ${doc.format.toUpperCase()} (${Math.round(blob.size / 1024)} KB).`);
     } catch { setNotice("Export failed. Reload and try again."); }
     finally { setBusy(false); }
   }
+  async function exportAllSizes() {
+    setBusy(true);
+    try {
+      await fontsReady();
+      const files = [];
+      for (const id of ["ig-square", "ig-portrait", "ig-story"]) {
+        const o = outputs.find((x) => x.id === id)!, d2 = reflow(doc, doc.output, id);
+        files.push({ name: `flowerful-${doc.product}-${o.ratio.replace(":", "x")}-${o.w}x${o.h}.${doc.format}`, blob: await toBlob(await renderToCanvas(d2, o.w, o.h), doc.format) });
+      }
+      const zip = await makeZip(files);
+      downloadBlob(zip, `flowerful-${doc.product}-all-sizes.zip`);
+      setNotice(`Downloaded 1:1, 4:5 and 9:16 as a zip (${Math.round(zip.size / 1024)} KB). Story text kept inside the safe zones.`);
+    } catch { setNotice("Export failed. Reload and try again."); }
+    finally { setBusy(false); }
+  }
+  async function recordMotion() {
+    if (typeof MediaRecorder === "undefined") { setNotice("This browser cannot record video."); return; }
+    setBusy(true); setProgress(0);
+    try {
+      await fontsReady();
+      const W = 1080, H = Math.round((1080 * out.h) / out.w), ms = motionSecs * 1000;
+      const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+      const c = cv.getContext("2d")!;
+      const mp4 = ["video/mp4;codecs=avc1.42E01F", "video/mp4"].find((m) => MediaRecorder.isTypeSupported(m));
+      const mime = mp4 ?? ["video/webm;codecs=vp9", "video/webm"].find((m) => MediaRecorder.isTypeSupported(m)) ?? "video/webm";
+      // pre-render each frame offscreen, then blit, so the stream never sees a half-drawn frame
+      const buf = document.createElement("canvas"); buf.width = W; buf.height = H;
+      const bc = buf.getContext("2d")!;
+      await renderDoc(bc, W, H, doc, { kind: motion, t: 0 }); c.drawImage(buf, 0, 0);
+      const stream = cv.captureStream(30), rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const chunks: Blob[] = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      const done = new Promise<void>((ok) => (rec.onstop = () => ok()));
+      rec.start(250);
+      const start = performance.now();
+      for (;;) {
+        const el = performance.now() - start;
+        if (el >= ms) break;
+        bc.clearRect(0, 0, W, H);
+        await renderDoc(bc, W, H, doc, { kind: motion, t: el / ms });
+        c.drawImage(buf, 0, 0);
+        setProgress(el / ms);
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+      }
+      rec.stop(); await done; stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks, { type: mime.split(";")[0] }), ext = mp4 ? "mp4" : "webm";
+      downloadBlob(blob, `flowerful-${doc.product}-${motion}-${W}x${H}.${ext}`);
+      setNotice(`Video ready: ${ext.toUpperCase()}, ${motionSecs}s, ${Math.round(blob.size / 1024)} KB.${mp4 ? "" : " This browser records WebM only; Instagram may need MP4, so convert or record in a Chromium browser that supports MP4."}`);
+    } catch { setNotice("Video recording failed. Try again or switch preset."); }
+    finally { setBusy(false); setProgress(null); }
+  }
+  // carousel
+  const carouselOn = doc.carousel.slides.length > 0;
+  const applySlide = (d: Doc, i: number): Doc => {
+    const sl = d.carousel.slides[i];
+    if (!sl) return d;
+    const b = d.carousel.base ?? { t: d.t, size: d.header.size };
+    const base = { ...d, output: d.carousel.size, carousel: { ...d.carousel, active: i, base: b } };
+    const sd = slideDoc({ ...base, t: b.t, header: { ...base.header, size: b.size } }, sl);
+    return { ...base, header: sd.header, sub: sd.sub, layers: sd.layers, t: sd.t };
+  };
+  function startCarousel(kind: "flourish" | "focus" | "blank") {
+    const slides = kind === "blank" ? [0, 1, 2].map(() => ({ header: doc.header.text, sub: doc.sub.text, can: true })) : storyTemplates[kind].slides;
+    commit((d) => {
+      const d0 = kind === "blank" ? d : { ...d, product: kind as ProductKey, ...(d.bgPreset ? { bg: defaultPresetFor(kind), bgPreset: bgPresets.find((x) => x.group.toLowerCase() === kind)?.id ?? d.bgPreset } : {}) };
+      const d1 = reflow(d0, d0.output, d.carousel.size);
+      return applySlide({ ...d1, carousel: { slides, active: 0, size: d.carousel.size, base: { t: d1.t, size: d1.header.size } } }, 0);
+    });
+    if (kind !== "blank") setCopyTab(groupForProduct(kind));
+  }
+  const updateSlide = (i: number, v: Partial<Slide>, key: string) => commit((d) => {
+    const slides = d.carousel.slides.map((sl, j) => (j === i ? { ...sl, ...v } : sl));
+    const nd = { ...d, carousel: { ...d.carousel, slides } };
+    return i === d.carousel.active ? applySlide(nd, i) : nd;
+  }, key);
+  function moveSlide(i: number, dir: number) {
+    commit((d) => { const s2 = [...d.carousel.slides], j = i + dir; if (j < 0 || j >= s2.length) return d; [s2[i], s2[j]] = [s2[j], s2[i]]; return applySlide({ ...d, carousel: { ...d.carousel, slides: s2 } }, j); });
+  }
+  async function exportCarousel() {
+    setBusy(true);
+    try {
+      await fontsReady();
+      const o = outputs.find((x) => x.id === doc.carousel.size)!, files = [];
+      const cb = doc.carousel.base ?? { t: doc.t, size: doc.header.size };
+      const base = reflow({ ...doc, t: cb.t, header: { ...doc.header, size: cb.size } }, doc.output, o.id);
+      for (const [i, sl] of doc.carousel.slides.entries()) {
+        const d2 = slideDoc(base, sl);
+        files.push({ name: `flowerful-${doc.product}-carousel-${String(i + 1).padStart(2, "0")}.${doc.format === "webp" ? "png" : doc.format}`, blob: await toBlob(await renderToCanvas(d2, o.w, o.h), doc.format === "webp" ? "png" : doc.format) });
+      }
+      const zip = await makeZip(files);
+      downloadBlob(zip, `flowerful-${doc.product}-carousel-${o.ratio.replace(":", "x")}.zip`);
+      setNotice(`Carousel downloaded: ${files.length} slides at ${o.w} × ${o.h} (${Math.round(zip.size / 1024)} KB).`);
+    } catch { setNotice("Carousel export failed."); }
+    finally { setBusy(false); }
+  }
+
 
   const txt = (k: "header" | "sub") => {
     const cfg = doc[k];
@@ -536,7 +752,7 @@ export default function Home() {
         <section className="stage">
           <div className="sizes">
             {outputs.map((o) => (
-              <button key={o.id} className={doc.output === o.id ? "on" : ""} onClick={() => commit((d) => ({ ...d, output: o.id }))}>
+              <button key={o.id} className={doc.output === o.id ? "on" : ""} onClick={() => commit((d) => reflow(d, d.output, o.id))}>
                 <span className="r" style={{ aspectRatio: `${o.w}/${o.h}` }} /><b>{o.ratio}</b><small>{o.label}</small>
               </button>
             ))}
@@ -545,11 +761,19 @@ export default function Home() {
             <div className="artboard" ref={boardRef} style={{ width: board.w, height: board.h }}>
               <canvas ref={baseRef} className="base" />
               {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && renderOverlay(k))}
+              {doc.output === "ig-story" && showSafe && (
+                <>
+                  <div className="safe top" style={{ height: `${STORY_TOP * 100}%` }}><span>Story UI · keep clear</span></div>
+                  <div className="safe bottom" style={{ height: `${STORY_BOTTOM * 100}%` }}><span>Reply bar · keep clear</span></div>
+                </>
+              )}
               {selected && <div className="guide" style={{ left: `${doc.t[selected].x}%`, opacity: doc.t[selected].x === 50 ? 1 : 0 }} />}
             </div>
           </div>
           <div className="stage-foot">
             <span>{out.label} · {out.w} × {out.h}px</span>
+            {doc.output === "ig-story" && <button className={`ghost small ${showSafe ? "on" : ""}`} onClick={() => setShowSafe((v) => !v)}>Safe zones {showSafe ? "on" : "off"}</button>}
+            {carouselOn && <span className="slide-tag">Slide {doc.carousel.active + 1} of {doc.carousel.slides.length}</span>}
             {notice && <span className="notice"><Sparkles /> {notice}</span>}
           </div>
         </section>
@@ -752,17 +976,78 @@ export default function Home() {
               </>
             )}
 
+            {tab === "carousel" && (
+              <>
+                <Group label="Start from">
+                  <div className="seg">
+                    <button onClick={() => startCarousel("flourish")}>FLOURISH story</button>
+                    <button onClick={() => startCarousel("focus")}>FOCUS story</button>
+                    <button onClick={() => startCarousel("blank")}>Blank</button>
+                  </div>
+                  <p className="hint">Five-slide ingredient stories. Every slide shares the background, logo and colours; each has its own header, sub line and can.</p>
+                </Group>
+                {carouselOn && (
+                  <>
+                    <Group label="Size">
+                      <div className="seg">{(["ig-square", "ig-portrait"] as const).map((id) => <button key={id} className={doc.carousel.size === id ? "on" : ""} onClick={() => commit((d) => { const nd = reflow(d, d.output, id), base = d.carousel.base ? { t: reflow({ ...d, t: d.carousel.base.t }, d.output, id).t, size: d.carousel.base.size } : undefined; return applySlide({ ...nd, carousel: { ...d.carousel, size: id, base } }, d.carousel.active); })}>{id === "ig-square" ? "1:1 Post" : "4:5 Portrait"}</button>)}</div>
+                    </Group>
+                    <div className="slides">
+                      {doc.carousel.slides.map((sl, i) => (
+                        <div key={i} className={`slide card ${doc.carousel.active === i ? "on" : ""}`} onClick={() => doc.carousel.active !== i && commit((d) => applySlide(d, i))}>
+                          <div className="slide-top">
+                            {thumbs[i] ? <img src={thumbs[i]} alt={`Slide ${i + 1}`} /> : <div className="ph-thumb" />}
+                            <div className="slide-meta">
+                              <b>{String(i + 1).padStart(2, "0")}</b>
+                              <div className="row tight">
+                                <button className="ghost small" title="Move up" onClick={(e) => { e.stopPropagation(); moveSlide(i, -1); }} disabled={i === 0}>↑</button>
+                                <button className="ghost small" title="Move down" onClick={(e) => { e.stopPropagation(); moveSlide(i, 1); }} disabled={i === doc.carousel.slides.length - 1}>↓</button>
+                                <button className="ghost small" title="Remove slide" disabled={doc.carousel.slides.length <= 2} onClick={(e) => { e.stopPropagation(); commit((d) => { const s2 = d.carousel.slides.filter((_, j) => j !== i); return applySlide({ ...d, carousel: { ...d.carousel, slides: s2 } }, Math.min(d.carousel.active, s2.length - 1)); }); }}>×</button>
+                              </div>
+                              <label className="chk"><input type="checkbox" checked={sl.can} onChange={(e) => updateSlide(i, { can: e.target.checked }, "")} /> Can</label>
+                            </div>
+                          </div>
+                          <textarea rows={2} value={sl.header} onChange={(e) => updateSlide(i, { header: e.target.value }, `sl-h-${i}`)} aria-label={`Slide ${i + 1} header`} />
+                          <input value={sl.sub} onChange={(e) => updateSlide(i, { sub: e.target.value }, `sl-s-${i}`)} aria-label={`Slide ${i + 1} sub line`} />
+                        </div>
+                      ))}
+                    </div>
+                    <button className="ghost wide" disabled={doc.carousel.slides.length >= 10} onClick={() => commit((d) => { const s2 = [...d.carousel.slides, { ...d.carousel.slides[d.carousel.slides.length - 1] }]; return applySlide({ ...d, carousel: { ...d.carousel, slides: s2 } }, s2.length - 1); })}>+ Add slide ({doc.carousel.slides.length}/10)</button>
+                    <button className="primary wide" onClick={exportCarousel} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${doc.carousel.slides.length} slides (${doc.format === "jpg" ? "JPG" : "PNG"} zip)`}</button>
+                    <button className="link" onClick={() => commit((d) => ({ ...d, carousel: { ...d.carousel, slides: [], base: undefined } }))}>End carousel</button>
+                  </>
+                )}
+              </>
+            )}
+
+            {tab === "motion" && (
+              <>
+                <Group label="Preset">
+                  <div className="outs">
+                    {motionPresets.map(([k, l, h]) => <button key={k} className={motion === k ? "on" : ""} onClick={() => setMotion(k)}><b>{l}</b><small>{h}</small></button>)}
+                  </div>
+                </Group>
+                <Range label="Length" unit="s" min={6} max={8} value={motionSecs} onChange={setMotionSecs} />
+                <div className="motion-prev">
+                  {motionPreview ? <canvas ref={motionRef} /> : <button className="ghost" onClick={() => setMotionPreview(true)}>Play preview</button>}
+                  {motionPreview && <button className="link" onClick={() => setMotionPreview(false)}>Stop preview</button>}
+                </div>
+                <button className="primary wide" onClick={recordMotion} disabled={busy}><Download /> {progress !== null ? `Recording… ${Math.round(progress * 100)}%` : `Record ${motionSecs}s loop · 1080 wide`}</button>
+                <p className="hint">Records in real time from the artboard at {out.ratio}. MP4 where the browser supports it (recent Chrome, Edge and Safari), otherwise WebM. Keep this tab in front while it records.</p>
+              </>
+            )}
+
             {tab === "export" && (
               <>
                 <Group label="Size">
                   <div className="outs">
-                    {outputs.map((o) => <button key={o.id} className={doc.output === o.id ? "on" : ""} onClick={() => commit((d) => ({ ...d, output: o.id }))}><b>{o.label}</b><small>{o.ratio} · {o.w} × {o.h}</small></button>)}
+                    {outputs.map((o) => <button key={o.id} className={doc.output === o.id ? "on" : ""} onClick={() => commit((d) => reflow(d, d.output, o.id))}><b>{o.label}</b><small>{o.ratio} · {o.w} × {o.h}</small></button>)}
                   </div>
                 </Group>
                 <Group label="Format">
                   <div className="seg">{(["png", "jpg", "webp"] as const).map((f) => <button key={f} className={doc.format === f ? "on" : ""} onClick={() => commit((d) => ({ ...d, format: f }))}>{f.toUpperCase()}</button>)}</div>
                 </Group>
                 <button className="primary wide" onClick={exportArt} disabled={busy}><Download /> {busy ? "Preparing…" : `Download ${out.w} × ${out.h} ${doc.format.toUpperCase()}`}</button>
+                <button className="ghost wide" onClick={exportAllSizes} disabled={busy}><Download /> Every size: 1:1, 4:5 and 9:16 (zip)</button>
                 <p className="hint">PNG for crisp text, JPG for the smallest file. Everything on the artboard is exported at full size.</p>
               </>
             )}
