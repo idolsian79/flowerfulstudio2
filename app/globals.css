@@ -159,3 +159,13 @@ textarea.big{font-family:var(--display);font-size:17px;font-weight:500;line-heig
 .outs b{font-family:var(--display);font-weight:500;}
 .outs small{color:var(--soft);font-size:11px;}
 @media (max-width:1100px){.work{grid-template-columns:200px 1fr 310px;}}
+.o-mark i{display:block;pointer-events:none;}
+.layer .mv{display:flex;flex:none;gap:1px;opacity:0;transition:opacity .12s;}
+.layer:hover .mv,.layer.on .mv{opacity:1;}
+.layer .mv button{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;color:var(--soft);}
+.layer .mv button:hover:not(:disabled){background:#fff;color:var(--ink);}
+.layer .mv svg{width:13px;height:13px;}
+.layer.fixed{border-top:0;}
+.layer.fixed:first-of-type{margin-top:6px;}
+.muted{color:var(--soft);font-size:11.5px;line-height:1.45;}
+.seg.small{flex-wrap:wrap;border-radius:14px;}

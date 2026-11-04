@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeftRight, Check, Download, Eye, EyeOff, ImagePlus, Layers3, LockKeyhole, Redo2,
+  ArrowLeftRight, Check, ChevronDown, ChevronUp, Download, Eye, EyeOff, ImagePlus, Layers3, LockKeyhole, Redo2,
   RefreshCw, RotateCcw, Sparkles, Undo2, Upload, WandSparkles, AlignLeft, AlignCenter, ExternalLink,
 } from "lucide-react";
 import { BgSettings, GradientType, LightDir, bgPresets, defaultPresetFor, drawBackground, drawCanShadow } from "@/lib/background";
@@ -36,7 +36,42 @@ const remixParts = {
   lens: ["close product portrait", "wide architectural frame", "low hero angle", "macro crop", "candid documentary frame"],
   material: ["translucent acrylic", "brushed chrome", "cool limestone", "high-gloss colour", "water and crushed ice"],
 };
-type OverlayKey = "product" | "radial" | "logo" | "wordmark" | "header" | "sub";
+type OverlayKey = "product" | "radial" | "icon" | "wordmark" | "lockup" | "header" | "sub";
+type MarkColour = "silver" | "white" | "ink" | "flavour";
+const defaultOrder: OverlayKey[] = ["radial", "product", "icon", "wordmark", "lockup", "header", "sub"];
+// brand mark sources (alpha masks, recoloured at render time)
+const ICON = { src: "/assets/brand-mark-white.png", a: 309 / 275 };
+const WORD = { src: "/assets/brand-wordmark-white.png", a: 1378 / 269 };
+const markCss = (m: MarkColour, sku: string) =>
+  m === "silver" ? "linear-gradient(160deg,#f2f2f2 0%,#b9b9b9 45%,#e2e2e2 70%,#9d9d9d 100%)" : m === "white" ? "#ffffff" : m === "ink" ? "#241A1E" : sku;
+// lockup geometry as fractions of artboard width (shared by preview and export)
+function lockupGeom(layout: "left" | "above", spacing: number) {
+  if (layout === "left") {
+    const ih = 1, iw = ih * ICON.a, wh = 0.5, ww = wh * WORD.a, gap = (spacing / 100) * ih;
+    const tw = iw + gap + ww, k = 0.5 / tw;
+    return { w: tw * k, h: ih * k, icon: { x: 0, y: 0, w: iw * k, h: ih * k }, word: { x: (iw + gap) * k, y: ((ih - wh) / 2) * k, w: ww * k, h: wh * k } };
+  }
+  const ih = 1, iw = ih * ICON.a, wh = 0.42, ww = wh * WORD.a, gap = (spacing / 100) * ih;
+  const tw = Math.max(iw, ww), k = 0.4 / tw;
+  return { w: tw * k, h: (ih + gap + wh) * k, icon: { x: ((tw - iw) / 2) * k, y: 0, w: iw * k, h: ih * k }, word: { x: ((tw - ww) / 2) * k, y: (ih + gap) * k, w: ww * k, h: wh * k } };
+}
+const iconW = 0.3, wordW = 0.44;
+// choosing a logo style also lays it out cleanly above the text (one undo step)
+function applyLogoStyle(d: Doc, k: "none" | "icon" | "wordmark" | "lockup" | "both"): Doc {
+  const layers = { ...d.layers, lockup: k === "lockup", icon: k === "icon" || k === "both", wordmark: k === "wordmark" || k === "both" };
+  const t = { ...d.t };
+  const textAt = (y: number) => {
+    t.header = { ...t.header, y }; t.sub = { ...t.sub, y: y + 9 };
+    // keep the can clear of the sub line
+    const top = y + 12, scale = Math.min(t.product.scale, (100 - top - 3) / 68);
+    t.product = { ...t.product, scale, y: top + (68 * scale) / 2 };
+  };
+  if (k === "icon") { t.icon = { x: 50, y: 9, scale: 0.4 }; textAt(22); }
+  if (k === "wordmark") { t.wordmark = { x: 50, y: 8, scale: 0.6 }; textAt(19); }
+  if (k === "both") { t.icon = { x: 50, y: 7, scale: 0.28 }; t.wordmark = { x: 50, y: 15, scale: 0.5 }; textAt(26); }
+  if (k === "lockup") { t.lockup = { x: 50, y: d.lockup.layout === "above" ? 11 : 8, scale: d.lockup.layout === "above" ? 0.6 : 0.8 }; textAt(d.lockup.layout === "above" ? 27 : 20); }
+  return { ...d, layers, t };
+}
 type T = { x: number; y: number; scale: number };
 type Align = "left" | "center";
 type Tone = "white" | "silver" | "black";
@@ -46,11 +81,14 @@ type Doc = {
   bg: BgSettings;
   bgPreset: string | null;
   image: string | null;
-  layers: { background: boolean; wash: boolean; radial: boolean; product: boolean; shadow: boolean; logo: boolean; wordmark: boolean; header: boolean; sub: boolean };
+  layers: { background: boolean; wash: boolean; radial: boolean; product: boolean; shadow: boolean; icon: boolean; wordmark: boolean; lockup: boolean; header: boolean; sub: boolean };
   t: Record<OverlayKey, T>;
   header: { text: string; caps: boolean; size: number; align: Align };
   sub: { text: string; custom: boolean; caps: boolean; size: number; align: Align };
   tone: Tone;
+  markColour: MarkColour;
+  lockup: { layout: "left" | "above"; spacing: number };
+  order: OverlayKey[];
   aligned: string | null;
   output: string;
   format: "png" | "jpg" | "webp";
@@ -62,31 +100,38 @@ const initialDoc: Doc = {
   bg: defaultPresetFor("flourish"),
   bgPreset: "flourish-dusk",
   image: null,
-  layers: { background: true, wash: false, radial: false, product: true, shadow: true, logo: false, wordmark: true, header: true, sub: true },
+  layers: { background: true, wash: false, radial: false, product: true, shadow: true, icon: false, wordmark: true, lockup: false, header: true, sub: true },
   t: {
     product: { x: 50, y: 62, scale: 1 },
     radial: { x: 76, y: 76, scale: 1 },
-    logo: { x: 50, y: 10, scale: 0.6 },
+    icon: { x: 50, y: 9, scale: 0.5 },
+    lockup: { x: 50, y: 9, scale: 1 },
     wordmark: { x: 50, y: 8, scale: 0.6 },
     header: { x: 50, y: 19, scale: 1 },
     sub: { x: 50, y: 28, scale: 1 },
   },
   header: { text: "BLUE IS THE NEW BLACK", caps: true, size: 7.4, align: "center" },
-  sub: { text: products.flourish.flavour, custom: false, caps: true, size: 2.2, align: "center" },
+  sub: { text: "Butterfly Pea & Raspberry", custom: false, caps: true, size: 2.2, align: "center" },
   tone: "white",
+  markColour: "white",
+  lockup: { layout: "left", spacing: 22 },
+  order: defaultOrder,
   aligned: null,
   output: "ig-square",
   format: "png",
 };
 const STORE = "flowerful-studio-v2";
-const layerOrder: Array<{ key: keyof Doc["layers"]; label: string; overlay?: OverlayKey; tab: Tab }> = [
-  { key: "sub", label: "Sub line", overlay: "sub", tab: "text" },
-  { key: "header", label: "Header", overlay: "header", tab: "text" },
-  { key: "wordmark", label: "Horizontal lockup", overlay: "wordmark", tab: "brand" },
-  { key: "logo", label: "Stacked lockup", overlay: "logo", tab: "brand" },
-  { key: "product", label: "Can", overlay: "product", tab: "can" },
+const overlayMeta: Record<OverlayKey, { label: string; layer: keyof Doc["layers"]; tab: Tab }> = {
+  sub: { label: "Sub line", layer: "sub", tab: "text" },
+  header: { label: "Header", layer: "header", tab: "text" },
+  lockup: { label: "Lockup", layer: "lockup", tab: "brand" },
+  wordmark: { label: "Wordmark", layer: "wordmark", tab: "brand" },
+  icon: { label: "Icon", layer: "icon", tab: "brand" },
+  product: { label: "Can", layer: "product", tab: "can" },
+  radial: { label: "Flower radial", layer: "radial", tab: "brand" },
+};
+const fixedLayers: Array<{ key: keyof Doc["layers"]; label: string; tab: Tab }> = [
   { key: "shadow", label: "Can shadow", tab: "can" },
-  { key: "radial", label: "Flower radial", overlay: "radial", tab: "brand" },
   { key: "wash", label: "Colour wash", tab: "brand" },
   { key: "background", label: "Background", tab: "background" },
 ];
@@ -146,7 +191,8 @@ export default function Home() {
       const raw = localStorage.getItem(STORE);
       if (raw) {
         const saved = JSON.parse(raw) as Partial<Doc>;
-        replace({ ...initialDoc, ...saved, layers: { ...initialDoc.layers, ...saved.layers }, t: { ...initialDoc.t, ...saved.t } });
+        const order = saved.order && defaultOrder.every((k) => saved.order!.includes(k)) ? saved.order.filter((k) => defaultOrder.includes(k)) : defaultOrder;
+        replace({ ...initialDoc, ...saved, order, lockup: { ...initialDoc.lockup, ...saved.lockup }, layers: { ...initialDoc.layers, ...saved.layers }, t: { ...initialDoc.t, ...saved.t } });
         if (saved.product) setCopyTab(groupForProduct(saved.product));
       }
     } catch {}
@@ -170,7 +216,7 @@ export default function Home() {
       const step = e.shiftKey ? 2 : 0.4;
       const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
       if (d) { e.preventDefault(); commit((x) => ({ ...x, t: { ...x.t, [selected]: { ...x.t[selected], x: x.t[selected].x + d[0], y: x.t[selected].y + d[1] } } }), "nudge-" + selected); }
-      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); toggleLayer(selected === "product" ? "product" : selected); setSelected(null); }
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); toggleLayer(overlayMeta[selected].layer); setSelected(null); }
       if (e.key === "Escape") setSelected(null);
     };
     window.addEventListener("keydown", onKey);
@@ -251,7 +297,7 @@ export default function Home() {
   // actions
   const setT = (k: OverlayKey, v: Partial<T>, key = "t-" + k) => commit((d) => ({ ...d, t: { ...d.t, [k]: { ...d.t[k], ...v } } }), key);
   const setBg = (v: Partial<BgSettings>, key: string) => commit((d) => ({ ...d, bg: { ...d.bg, ...v }, bgPreset: null, bgSource: "create", layers: { ...d.layers, background: true } }), key);
-  function toggleLayer(k: keyof Doc["layers"]) { commit((d) => ({ ...d, layers: { ...d.layers, [k]: !d.layers[k] } })); }
+  function toggleLayer(k: keyof Doc["layers"]) { commit((d) => ({ ...d, layers: { ...d.layers, [k]: !d.layers[k], ...(k === "lockup" && !d.layers.lockup ? { icon: false, wordmark: false } : {}), ...((k === "icon" || k === "wordmark") && !d.layers[k] ? { lockup: false } : {}) } })); }
   function pickProduct(k: ProductKey) {
     commit((d) => ({
       ...d, product: k, aligned: null,
@@ -305,7 +351,7 @@ export default function Home() {
   function beginDrag(e: React.PointerEvent, key: OverlayKey, mode: "move" | "resize") {
     e.preventDefault(); e.stopPropagation();
     setSelected(key);
-    setTab(layerOrder.find((l) => l.overlay === key)!.tab);
+    setTab(overlayMeta[key].tab);
     const rect = boardRef.current!.getBoundingClientRect();
     const sx = e.clientX, sy = e.clientY, start = doc.t[key], gk = `drag-${key}-${Date.now()}`;
     const move = (ev: PointerEvent) => {
@@ -331,21 +377,22 @@ export default function Home() {
       const c = cv.getContext("2d")!;
       if (d.format === "jpg") { c.fillStyle = "#fff"; c.fillRect(0, 0, W, H); }
       await paintBase(c, W, H, d);
-      if (d.layers.radial && d.product !== "lineup") {
-        const r = await loadImg(products[d.product].radial), t = d.t.radial, rw = W * 0.58 * t.scale, rh = (rw * r.height) / r.width;
-        c.save(); c.globalAlpha = 0.76; c.globalCompositeOperation = "multiply"; c.drawImage(r, (W * t.x) / 100 - rw / 2, (H * t.y) / 100 - rh / 2, rw, rh); c.restore();
-      }
-      if (d.layers.product) {
-        const img = await loadImg(d.product === "lineup" ? "/assets/can-lineup.png" : `/assets/can-${d.product}.png`);
-        const b = canBox(W, H, d);
-        c.save(); c.filter = d.aligned ?? "none"; c.drawImage(img, b.cx - b.w / 2, b.cy - b.h / 2, b.w, b.h); c.restore();
-      }
-      for (const k of ["logo", "wordmark"] as const) {
-        if (!d.layers[k]) continue;
-        const img = await loadImg(`/assets/brand-${k === "logo" ? "mark" : "wordmark"}-${d.tone}.png`), t = d.t[k];
-        const w = W * (k === "logo" ? 0.34 : 0.44) * t.scale, h = (w * img.height) / img.width;
-        c.drawImage(img, (W * t.x) / 100 - w / 2, (H * t.y) / 100 - h / 2, w, h);
-      }
+      const sku = products[d.product].color;
+      const drawMark = async (src: string, x: number, y: number, w: number, h: number) => {
+        const img = await loadImg(src);
+        const off = document.createElement("canvas"); off.width = Math.max(1, Math.round(w)); off.height = Math.max(1, Math.round(h));
+        const o = off.getContext("2d")!;
+        o.drawImage(img, 0, 0, off.width, off.height);
+        o.globalCompositeOperation = "source-in";
+        if (d.markColour === "silver") {
+          // same angle and stops as the CSS gradient
+          const g = o.createLinearGradient(0, 0, off.width, off.height * 0.6);
+          [["#f2f2f2", 0], ["#b9b9b9", 0.45], ["#e2e2e2", 0.7], ["#9d9d9d", 1]].forEach(([c, t]) => g.addColorStop(t as number, c as string));
+          o.fillStyle = g;
+        } else o.fillStyle = markCss(d.markColour, sku);
+        o.fillRect(0, 0, off.width, off.height);
+        c.drawImage(off, x, y, w, h);
+      };
       const drawText = (k: "header" | "sub") => {
         const cfg = d[k], t = d.t[k];
         const lines = linesOf(cfg.text, cfg.caps), fs = (cfg.size / 100) * W * t.scale;
@@ -361,8 +408,25 @@ export default function Home() {
         lines.forEach((ln, i) => c.fillText(ln, x, top + (i + 0.5) * lh + fs * 0.04));
         c.restore();
       };
-      if (d.layers.header) drawText("header");
-      if (d.layers.sub) drawText("sub");
+      for (const k of d.order) {
+        if (!d.layers[overlayMeta[k].layer]) continue;
+        const t = d.t[k], cx = (W * t.x) / 100, cy = (H * t.y) / 100;
+        if (k === "radial" && d.product !== "lineup") {
+          const r = await loadImg(products[d.product].radial), rw = W * 0.58 * t.scale, rh = (rw * r.height) / r.width;
+          c.save(); c.globalAlpha = 0.76; c.globalCompositeOperation = "multiply"; c.drawImage(r, cx - rw / 2, cy - rh / 2, rw, rh); c.restore();
+        } else if (k === "product") {
+          const img = await loadImg(d.product === "lineup" ? "/assets/can-lineup.png" : `/assets/can-${d.product}.png`);
+          const b = canBox(W, H, d);
+          c.save(); c.filter = d.aligned ?? "none"; c.drawImage(img, b.cx - b.w / 2, b.cy - b.h / 2, b.w, b.h); c.restore();
+        } else if (k === "icon" || k === "wordmark") {
+          const m = k === "icon" ? ICON : WORD, w = W * (k === "icon" ? iconW : wordW) * t.scale, h = w / m.a;
+          await drawMark(m.src, cx - w / 2, cy - h / 2, w, h);
+        } else if (k === "lockup") {
+          const g = lockupGeom(d.lockup.layout, d.lockup.spacing), s2 = W * t.scale, x0 = cx - (g.w * s2) / 2, y0 = cy - (g.h * s2) / 2;
+          await drawMark(ICON.src, x0 + g.icon.x * s2, y0 + g.icon.y * s2, g.icon.w * s2, g.icon.h * s2);
+          await drawMark(WORD.src, x0 + g.word.x * s2, y0 + g.word.y * s2, g.word.w * s2, g.word.h * s2);
+        } else if (k === "header" || k === "sub") drawText(k);
+      }
       const mime = d.format === "jpg" ? "image/jpeg" : `image/${d.format}`;
       const blob = await new Promise<Blob>((ok, no) => cv.toBlob((b) => (b ? ok(b) : no(new Error())), mime, d.format === "png" ? undefined : 0.94));
       const url = URL.createObjectURL(blob);
@@ -373,7 +437,6 @@ export default function Home() {
     finally { setBusy(false); }
   }
 
-  const sel = (k: OverlayKey) => selected === k;
   const txt = (k: "header" | "sub") => {
     const cfg = doc[k];
     return (
@@ -381,7 +444,42 @@ export default function Home() {
         {linesOf(cfg.text, cfg.caps).map((ln, i) => <div key={i} className={cfg.caps && k === "sub" ? "caps" : ""}>{ln || "\u00a0"}</div>)}
       </div>
     );
+  };  const sel = (k: OverlayKey) => selected === k;
+  const markStyle = (src: string, w: number, h: number): React.CSSProperties => ({
+    width: `${w}cqw`, height: `${h}cqw`, background: markCss(doc.markColour, p.color),
+    WebkitMaskImage: `url(${src})`, maskImage: `url(${src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%",
+  });
+  const renderOverlay = (k: OverlayKey) => {
+    const common = { id: k, t: doc.t[k], selected: sel(k), onStart: beginDrag };
+    if (k === "radial") return doc.product === "lineup" ? null : <Overlay key={k} {...common} className="o-radial"><img src={p.radial} alt="" /></Overlay>;
+    if (k === "product") return (
+      <Overlay key={k} {...common} className={doc.product === "lineup" ? "o-lineup" : "o-can"}>
+        <img src={doc.product === "lineup" ? "/assets/can-lineup.png" : `/assets/can-${doc.product}.png`} alt={`${p.name} can`} style={{ filter: doc.aligned ?? "none" }}
+          onLoad={(e) => { const i = e.currentTarget; const a = i.naturalWidth / i.naturalHeight; setCanAspect((m) => (m[doc.product] === a ? m : { ...m, [doc.product]: a })); }} />
+      </Overlay>
+    );
+    if (k === "icon") return <Overlay key={k} {...common} className="o-mark"><i style={markStyle(ICON.src, iconW * 100, (iconW * 100) / ICON.a)} /></Overlay>;
+    if (k === "wordmark") return <Overlay key={k} {...common} className="o-mark"><i style={markStyle(WORD.src, wordW * 100, (wordW * 100) / WORD.a)} /></Overlay>;
+    if (k === "lockup") {
+      const g = lockupGeom(doc.lockup.layout, doc.lockup.spacing);
+      return (
+        <Overlay key={k} {...common} className="o-mark">
+          <div style={{ position: "relative", width: `${g.w * 100}cqw`, height: `${g.h * 100}cqw` }}>
+            <i style={{ ...markStyle(ICON.src, g.icon.w * 100, g.icon.h * 100), position: "absolute", left: `${g.icon.x * 100}cqw`, top: `${g.icon.y * 100}cqw` }} />
+            <i style={{ ...markStyle(WORD.src, g.word.w * 100, g.word.h * 100), position: "absolute", left: `${g.word.x * 100}cqw`, top: `${g.word.y * 100}cqw` }} />
+          </div>
+        </Overlay>
+      );
+    }
+    return <Overlay key={k} {...common} className="o-text">{txt(k)}</Overlay>;
   };
+  const moveLayer = (k: OverlayKey, dir: 1 | -1) => commit((d) => {
+    const o = [...d.order], i = o.indexOf(k), j = i + dir;
+    if (j < 0 || j >= o.length) return d;
+    [o[i], o[j]] = [o[j], o[i]];
+    return { ...d, order: o };
+  });
+
 
   return (
     <main className="app">
@@ -403,9 +501,21 @@ export default function Home() {
         <aside className="left panel">
           <div className="ph"><Layers3 /> Layers</div>
           <div className="layers">
-            {layerOrder.filter((l) => !(l.key === "radial" && doc.product === "lineup")).map((l) => (
-              <div key={l.key} className={`layer ${l.overlay && sel(l.overlay) ? "on" : ""} ${doc.layers[l.key] ? "" : "off"}`}
-                onClick={() => { setTab(l.tab); if (l.overlay) setSelected(l.overlay); }}>
+            {[...doc.order].reverse().filter((k) => !(k === "radial" && doc.product === "lineup")).map((k, idx, arr) => {
+              const m = overlayMeta[k], on = doc.layers[m.layer];
+              return (
+                <div key={k} className={`layer ${sel(k) ? "on" : ""} ${on ? "" : "off"}`} onClick={() => { setTab(m.tab); setSelected(k); }}>
+                  <button className="eye" title={on ? "Hide" : "Show"} onClick={(e) => { e.stopPropagation(); toggleLayer(m.layer); }}>{on ? <Eye /> : <EyeOff />}</button>
+                  <span>{m.label}</span>
+                  <span className="mv">
+                    <button title="Bring forward" disabled={idx === 0} onClick={(e) => { e.stopPropagation(); moveLayer(k, 1); }}><ChevronUp /></button>
+                    <button title="Send backward" disabled={idx === arr.length - 1} onClick={(e) => { e.stopPropagation(); moveLayer(k, -1); }}><ChevronDown /></button>
+                  </span>
+                </div>
+              );
+            })}
+            {fixedLayers.map((l) => (
+              <div key={l.key} className={`layer fixed ${doc.layers[l.key] ? "" : "off"}`} onClick={() => setTab(l.tab)}>
                 <button className="eye" title={doc.layers[l.key] ? "Hide" : "Show"} onClick={(e) => { e.stopPropagation(); toggleLayer(l.key); }}>{doc.layers[l.key] ? <Eye /> : <EyeOff />}</button>
                 <span>{l.label}</span>
                 {l.key === "background" && <i className="sw" style={{ background: doc.bgSource === "image" && doc.image ? `center/cover url(${doc.image})` : `linear-gradient(135deg, ${doc.bg.c1}, ${doc.bg.c2})` }} />}
@@ -434,19 +544,7 @@ export default function Home() {
           <div className="shell" ref={shellRef} onPointerDown={() => setSelected(null)}>
             <div className="artboard" ref={boardRef} style={{ width: board.w, height: board.h }}>
               <canvas ref={baseRef} className="base" />
-              {doc.layers.radial && doc.product !== "lineup" && (
-                <Overlay id="radial" t={doc.t.radial} selected={sel("radial")} onStart={beginDrag} className="o-radial"><img src={p.radial} alt="" /></Overlay>
-              )}
-              {doc.layers.product && (
-                <Overlay id="product" t={doc.t.product} selected={sel("product")} onStart={beginDrag} className={doc.product === "lineup" ? "o-lineup" : "o-can"}>
-                  <img src={doc.product === "lineup" ? "/assets/can-lineup.png" : `/assets/can-${doc.product}.png`} alt={`${p.name} can`} style={{ filter: doc.aligned ?? "none" }}
-                    onLoad={(e) => { const i = e.currentTarget; const a = i.naturalWidth / i.naturalHeight; setCanAspect((m) => (m[doc.product] === a ? m : { ...m, [doc.product]: a })); }} />
-                </Overlay>
-              )}
-              {doc.layers.logo && <Overlay id="logo" t={doc.t.logo} selected={sel("logo")} onStart={beginDrag} className="o-logo"><img src={`/assets/brand-mark-${doc.tone}.png`} alt="" /></Overlay>}
-              {doc.layers.wordmark && <Overlay id="wordmark" t={doc.t.wordmark} selected={sel("wordmark")} onStart={beginDrag} className="o-wordmark"><img src={`/assets/brand-wordmark-${doc.tone}.png`} alt="" /></Overlay>}
-              {doc.layers.header && <Overlay id="header" t={doc.t.header} selected={sel("header")} onStart={beginDrag} className="o-text">{txt("header")}</Overlay>}
-              {doc.layers.sub && <Overlay id="sub" t={doc.t.sub} selected={sel("sub")} onStart={beginDrag} className="o-text">{txt("sub")}</Overlay>}
+              {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && renderOverlay(k))}
               {selected && <div className="guide" style={{ left: `${doc.t[selected].x}%`, opacity: doc.t[selected].x === 50 ? 1 : 0 }} />}
             </div>
           </div>
@@ -612,12 +710,39 @@ export default function Home() {
 
             {tab === "brand" && (
               <>
-                <Group label="Logo and text colour">
+                <Group label="Text colour">
                   <div className="seg">
                     {(["white", "silver", "black"] as Tone[]).map((x) => <button key={x} className={doc.tone === x ? "on" : ""} onClick={() => commit((d) => ({ ...d, tone: x }))}><i className="dot" style={{ background: toneHex[x] }} /> {x[0].toUpperCase() + x.slice(1)}</button>)}
                   </div>
                 </Group>
-                {([["wordmark", "Horizontal lockup"], ["logo", "Stacked lockup"], ...(doc.product === "lineup" ? [] : [["radial", "Flower radial"]])] as Array<["wordmark" | "logo" | "radial", string]>).map(([k, l]) => (
+                <Group label="Logo colour">
+                  <div className="seg">
+                    {([["silver", "Matte silver"], ["white", "White"], ["ink", "Ink"], ["flavour", p.name === "LINE-UP" ? "Flavour" : p.name[0] + p.name.slice(1).toLowerCase()]] as Array<[MarkColour, string]>).map(([x, l]) => (
+                      <button key={x} className={doc.markColour === x ? "on" : ""} onClick={() => commit((d) => ({ ...d, markColour: x }))}><i className="dot" style={{ background: markCss(x, p.color) }} /> {l}</button>
+                    ))}
+                  </div>
+                </Group>
+                <div className="card">
+                  <div className="card-h"><b>Logo style</b></div>
+                  <div className="seg small">
+                    {([["none", "None"], ["icon", "Icon"], ["wordmark", "Wordmark"], ["lockup", "Lockup"], ["both", "Icon + wordmark"]] as const).map(([k, l]) => {
+                      const L = doc.layers, cur = L.lockup ? "lockup" : L.icon && L.wordmark ? "both" : L.icon ? "icon" : L.wordmark ? "wordmark" : "none";
+                      return <button key={k} className={cur === k ? "on" : ""} onClick={() => commit((d) => applyLogoStyle(d, k))}>{l}</button>;
+                    })}
+                  </div>
+                  <small className="muted">Lockup keeps the icon and wordmark together as one layer. Icon + wordmark gives two separate layers you can place apart.</small>
+                </div>
+                {doc.layers.lockup && (
+                  <div className="card">
+                    <div className="card-h"><b>Lockup</b><Switch on onClick={() => toggleLayer("lockup")} /></div>
+                    <div className="seg">
+                      {([["left", "Icon left"], ["above", "Icon above"]] as const).map(([k, l]) => <button key={k} className={doc.lockup.layout === k ? "on" : ""} onClick={() => commit((d) => applyLogoStyle({ ...d, lockup: { ...d.lockup, layout: k } }, "lockup"))}>{l}</button>)}
+                    </div>
+                    <Range label="Spacing" unit="%" min={0} max={80} value={doc.lockup.spacing} onChange={(v) => commit((d) => ({ ...d, lockup: { ...d.lockup, spacing: v } }), "lsp")} />
+                    <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t.lockup.scale * 100)} onChange={(v) => setT("lockup", { scale: v / 100 })} />
+                  </div>
+                )}
+                {([["icon", "Icon"], ["wordmark", "Wordmark"], ...(doc.product === "lineup" ? [] : [["radial", "Flower radial"]])] as Array<["icon" | "wordmark" | "radial", string]>).filter(([k]) => k === "radial" || doc.layers[k]).map(([k, l]) => (
                   <div key={k} className="card">
                     <div className="card-h"><b>{l}</b><Switch on={doc.layers[k]} onClick={() => toggleLayer(k)} /></div>
                     {doc.layers[k] && <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t[k].scale * 100)} onChange={(v) => setT(k, { scale: v / 100 })} />}
