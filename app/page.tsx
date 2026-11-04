@@ -7,7 +7,7 @@ import {
 import { BgSettings, GradientType, LightDir, bgPresets, defaultPresetFor, drawBackground, drawCanShadow } from "@/lib/background";
 import { CopyGroup, Slide, copyGroups, groupForProduct, headerLines, originalCount, storyTemplates, subLines } from "@/lib/copy";
 import { makeZip } from "@/lib/zip";
-import { StickerColour, StickerGroup, badgeTextColour, botanicalsFor, mix, paletteFor, stickerById, stickerSvg, stickers, svgUrl } from "@/lib/stickers";
+import { StickerColour, StickerGroup, badgeFont, badgeTracking, propPalette, badgeTextColour, botanicalsFor, mix, paletteFor, stickerById, stickerSvg, stickers, svgUrl } from "@/lib/stickers";
 import { PropArr, SetSettings, SetShape, defaultSet, drawSet, drawWorld, propArrangements, propSpots, setGeometry, setPalettes, setShapes } from "@/lib/set";
 
 const products = {
@@ -210,8 +210,8 @@ function badgeFs(def: ReturnType<typeof stickerById>, text: string, w: number) {
   let fs = h * ta.size;
   if (typeof document === "undefined") return fs;
   mctx ??= measureCtx();
-  mctx.font = `500 100px Fredoka`;
-  const widest = Math.max(...lines.map((l) => mctx!.measureText(l).width * (1 + 0.04 * l.length / 10))) / 100;
+  mctx.font = badgeFont(100);
+  const widest = Math.max(...lines.map((l) => mctx!.measureText(l).width + badgeTracking * 100 * l.length)) / 100;
   if (widest * fs > w * ta.w) fs = (w * ta.w) / widest;
   return fs;
 }
@@ -263,7 +263,7 @@ const stickerSpots: Record<LayoutKind, Array<[number, number]>> = {
 };
 function makeSticker(kind: string, x: number, y: number, product: ProductKey, extra: Partial<StickerLayer> = {}): StickerLayer {
   const def = stickerById(kind);
-  const colour: StickerColour = def.group === "Botanicals" ? "natural" : "white";
+  const colour: StickerColour = "white";
   const text = def.id === "badge-tag" ? products[product].name : def.text;
   return { uid: uid(), kind, x, y, scale: def.group === "Badges" ? 0.9 : 0.7, rot: 0, flip: false, opacity: 1, colour, text, repeat: "none", density: 1, ...extra };
 }
@@ -593,13 +593,17 @@ export default function Home() {
       if (set.props !== "none" && d.product !== "lineup") {
         const kinds = botanicalsFor(d.product), dir = set.light === "left" ? 1 : -1;
         for (const sp of propSpots(W, H, set, b.cx, b.w, set.props)) {
-          const def = stickerById(kinds[sp.i % kinds.length]), img = await loadImg(svgUrl(stickerSvg(def.id, def.natural)));
+          const def = stickerById(kinds[sp.i % kinds.length]), img = await loadImg(svgUrl(stickerSvg(def.id, propPalette(def))));
           const pw = W * 0.085 * sp.s * set.propSize, ph = pw;
           // contact + cast shadow on the surface it rests on
           c.save(); c.globalAlpha = 0.35; c.fillStyle = mix(set.wall, -0.55);
           c.beginPath(); c.ellipse(sp.x + dir * pw * 0.35, sp.y, pw * 0.62, pw * 0.1, 0, 0, TAU); c.fill(); c.restore();
-          c.save(); c.translate(sp.x, sp.y); c.rotate((sp.r * Math.PI) / 180 * 0.4);
-          c.drawImage(img, -pw / 2, -ph * 0.94, pw, ph); c.restore();
+          // loose ingredients lie on the surface; upright ones (flowers, berries, buds) stand on their base
+          const lie = ({ "saffron-thread": 84, "cardamom-pod": 72, petal: 76, leaf: 50, petals: 0 } as Record<string, number>)[def.id];
+          c.save();
+          if (lie) { c.translate(sp.x, sp.y - pw * 0.13); c.rotate(((sp.i % 2 ? -1 : 1) * lie + sp.r * 0.3) * Math.PI / 180); c.drawImage(img, -pw / 2, -ph / 2, pw, ph); }
+          else { c.translate(sp.x, sp.y); c.rotate((sp.r * Math.PI) / 180 * 0.4); c.drawImage(img, -pw / 2, -ph * 0.94, pw, ph); }
+          c.restore();
         }
         void g;
       }
@@ -621,10 +625,10 @@ export default function Home() {
       if (def.textArea && st.text) {
         if (st.flip) c.scale(-1, 1);
         const fs = badgeFs(def, st.text, w), lines = st.text.split("\n");
-        c.font = `500 ${fs}px Fredoka`; c.fillStyle = badgeTextColour(def, pal); c.textAlign = "center"; c.textBaseline = "middle";
-        (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${fs * 0.04}px`;
+        c.font = badgeFont(fs); c.fillStyle = badgeTextColour(def, pal); c.textAlign = "center"; c.textBaseline = "middle";
+        (c as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${fs * badgeTracking}px`;
         const cx = (def.textArea.x - 0.5) * w, cy = (def.textArea.y - 0.5) * h;
-        lines.forEach((ln, i) => c.fillText(ln, cx, cy + (i - (lines.length - 1) / 2) * fs * 1.02 + fs * 0.04));
+        lines.forEach((ln, i) => c.fillText(ln, cx + (fs * badgeTracking) / 2, cy + (i - (lines.length - 1) / 2) * fs * 1.2 + fs * 0.04));
       }
       c.restore();
     };
@@ -1002,7 +1006,7 @@ export default function Home() {
       <div key={st.uid} className={`ov o-sticker ${on ? "sel" : ""}`} style={{ left: `${st.x}%`, top: `${st.y}%`, width: `${w}cqw`, height: `${h}cqw`, opacity: st.opacity, transform: `translate(-50%, -50%) rotate(${st.rot}deg)` }} onPointerDown={(e) => beginStickerDrag(e, st, "move")}>
         <img src={svgUrl(stickerSvg(def.id, pal))} alt={def.name} style={{ transform: st.flip ? "scaleX(-1)" : undefined }} draggable={false} />
         {def.textArea && st.text && (
-          <div className="st-text" style={{ left: `${def.textArea.x * 100}%`, top: `${def.textArea.y * 100}%`, fontSize: `${fs}cqw`, color: badgeTextColour(def, pal), letterSpacing: `${fs * 0.04}cqw` }}>
+          <div className="st-text" style={{ left: `${def.textArea.x * 100}%`, top: `${def.textArea.y * 100}%`, fontSize: `${fs}cqw`, color: badgeTextColour(def, pal), letterSpacing: `${fs * badgeTracking}cqw`, fontFamily: "Inter, sans-serif", lineHeight: 1.2, paddingLeft: `${fs * badgeTracking}cqw` }}>
             {st.text.split("\n").map((l, i) => <div key={i}>{l}</div>)}
           </div>
         )}

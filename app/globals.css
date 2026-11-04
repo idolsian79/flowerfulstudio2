@@ -185,7 +185,7 @@ textarea.big{font-family:var(--display);font-size:17px;font-weight:500;line-heig
 .shuffle-bar .lock{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:6px 10px;border-radius:99px;border:1px solid var(--line);background:var(--panel);color:var(--soft);cursor:pointer}
 .shuffle-bar .lock svg{width:13px;height:13px}.shuffle-bar .lock.on{background:var(--sel);border-color:var(--sel);color:#fff}
 .o-sticker img{width:100%;height:100%;display:block;pointer-events:none}
-.o-sticker .st-text{position:absolute;transform:translate(-50%,-50%);font-family:Fredoka,sans-serif;font-weight:500;line-height:1.02;text-align:center;white-space:nowrap;pointer-events:none}
+.o-sticker .st-text{position:absolute;transform:translate(-50%,-50%);font-family:Inter,sans-serif;font-weight:500;line-height:1.2;text-align:center;white-space:nowrap;pointer-events:none}
 .o-sticker .handle.rot{left:50%;top:-22px;right:auto;bottom:auto;transform:translateX(-50%);border-radius:50%;cursor:grab}
 .set-presets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.set-presets button{display:flex;flex-direction:column;gap:4px;align-items:center;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:11.5px;cursor:pointer}
 .set-presets button.on{outline:2px solid var(--sel)}.set-presets canvas{width:100%;aspect-ratio:1;border-radius:7px}
@@ -194,7 +194,7 @@ textarea.big{font-family:var(--display);font-size:17px;font-weight:500;line-heig
 .st-grid button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,#f3edf9,#e9eefc);cursor:pointer;font-size:11px}
 .st-grid button.match{box-shadow:inset 0 0 0 1.5px var(--sel)}
 .st-prev{position:relative;width:62px;max-height:54px;display:flex;align-items:center;justify-content:center}.st-prev img{width:100%;height:100%;object-fit:contain}
-.st-prev em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 9px Fredoka,sans-serif;font-style:normal}
+.st-prev em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 7px Inter,sans-serif;letter-spacing:.2em;font-style:normal}
 .st-list{display:flex;flex-wrap:wrap;gap:5px}.st-list button{font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:var(--panel);cursor:pointer}.st-list button.on{background:var(--sel);color:#fff}
 .series{display:flex;gap:6px;margin:6px 0}.series img{width:calc(50% - 3px);border-radius:8px}
 .modal-bg{position:fixed;inset:0;background:rgba(36,26,30,.38);display:flex;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(3px)}
