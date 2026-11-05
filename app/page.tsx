@@ -97,6 +97,7 @@ type Doc = {
   tone: Tone;
   markColour: MarkColour;
   lockup: { layout: "left" | "above"; spacing: number };
+  bgT?: { src: string; x: number; y: number; z: number };
   order: OverlayKey[];
   carousel: { slides: Slide[]; active: number; size: "ig-square" | "ig-portrait"; base?: { t: Doc["t"]; size: number } };
   set: SetSettings;
@@ -175,6 +176,12 @@ const motionPresets: Array<[MotionKind, string, string]> = [
 const STORY_TOP = 250 / 1920, STORY_BOTTOM = 340 / 1920;
 const safeBand = (id: string) => (id === "ig-story" ? [STORY_TOP * 100, 100 - STORY_BOTTOM * 100] : [0, 100]);
 // move a layout designed at one size onto another, keeping text and logos inside Story safe zones
+// background plate placement: x/y in -1..1 of the spare overflow, z >= 1 on top of cover, so the plate always fills the canvas
+function bgPlace(d: Doc, W: number, H: number, iw: number, ih: number) {
+  const t = d.bgT && d.bgT.src === d.image ? d.bgT : { x: 0, y: 0, z: 1 };
+  const s = Math.max(W / iw, H / ih) * Math.max(1, t.z), w = iw * s, h = ih * s;
+  return { x: (W - w) * (1 - t.x) / 2, y: (H - h) * (1 - t.y) / 2, w, h, t };
+}
 function reflow(d: Doc, fromId: string, toId: string): Doc {
   if (fromId === toId) return d;
   const from = outputs.find((o) => o.id === fromId)!, to = outputs.find((o) => o.id === toId)!;
@@ -476,6 +483,10 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
+  const [bgEdit, setBgEdit] = useState(false);
+  const bgDrag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const curBgT = () => (doc.bgT && doc.bgT.src === doc.image ? doc.bgT : { src: doc.image ?? "", x: 0, y: 0, z: 1 });
+  const setBgT = (v: Partial<{ x: number; y: number; z: number }>, key: string) => commit((d) => { const b = d.bgT && d.bgT.src === d.image ? d.bgT : { src: d.image ?? "", x: 0, y: 0, z: 1 }; const n = { ...b, ...v }; n.x = Math.max(-1, Math.min(1, n.x)); n.y = Math.max(-1, Math.min(1, n.y)); n.z = Math.max(1, Math.min(4, n.z)); return { ...d, bgT: n }; }, key);
   const boardRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const p = products[doc.product];
@@ -579,8 +590,8 @@ export default function Home() {
     else if (d.layers.background) {
       if (d.bgSource === "image" && d.image) {
         const bg = await loadImg(d.image);
-        const cover = Math.max(W / bg.width, H / bg.height);
-        c.drawImage(bg, (W - bg.width * cover) / 2, (H - bg.height * cover) / 2, bg.width * cover, bg.height * cover);
+        const g = bgPlace(d, W, H, bg.width, bg.height);
+        c.drawImage(bg, g.x, g.y, g.w, g.h);
       } else drawBackground(c, W, H, bg, lp);
     }
     if (d.layers.wash) {
@@ -826,7 +837,7 @@ export default function Home() {
           const img = await loadImg(d.product === "lineup" ? "/assets/can-lineup.png" : `/assets/can-${d.product}.png`);
           const b = canBox(W, H, d);
           c.save(); c.filter = d.aligned ?? "none"; c.drawImage(img, b.cx - b.w / 2, b.cy - b.h / 2, b.w, b.h); c.restore();
-          if (d.fg && d.bgSource === "image") { const f = await loadImg(d.fg); const cover = Math.max(W / f.width, H / f.height); c.drawImage(f, (W - f.width * cover) / 2, (H - f.height * cover) / 2, f.width * cover, f.height * cover); }
+          if (d.fg && d.bgSource === "image") { const f = await loadImg(d.fg); const g = bgPlace(d, W, H, f.width, f.height); c.drawImage(f, g.x, g.y, g.w, g.h); }
         } else if (k === "icon" || k === "wordmark") {
           const m = k === "icon" ? ICON : WORD, w = W * (k === "icon" ? iconW : wordW) * t.scale, h = w / m.a;
           await drawMark(m.src, cx - w / 2, cy - h / 2, w, h);
@@ -1145,10 +1156,14 @@ export default function Home() {
               </button>
             ))}
           </div>
-          <div className="shell" ref={shellRef} onPointerDown={() => { setSelected(null); setSelSticker(null); }}>
+          <div className={`shell ${bgEdit ? "bg-edit" : ""}`} ref={shellRef} style={bgEdit ? { cursor: "grab" } : undefined}
+            onPointerDown={(e) => { setSelected(null); setSelSticker(null); if (bgEdit && doc.bgSource === "image" && doc.image) { const b = curBgT(); bgDrag.current = { px: e.clientX, py: e.clientY, x: b.x, y: b.y }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } }}
+            onPointerMove={(e) => { const g = bgDrag.current, el = shellRef.current; if (!g || !el) return; const r = el.getBoundingClientRect(), z = Math.max(1, curBgT().z), k = 2 / Math.max(0.05, z * 1.4 - 1); setBgT({ x: g.x + ((e.clientX - g.px) / r.width) * k, y: g.y + ((e.clientY - g.py) / r.height) * k }, "bgpan"); }}
+            onPointerUp={() => { bgDrag.current = null; }}
+            onWheel={(e) => { if (bgEdit && doc.bgSource === "image" && doc.image) setBgT({ z: curBgT().z * (e.deltaY < 0 ? 1.05 : 1 / 1.05) }, "bgzoom"); }}>
             <div className="artboard" ref={boardRef} style={{ width: board.w, height: board.h }}>
               <canvas ref={baseRef} className="base" />
-              {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && (k === "product" && doc.fg && doc.bgSource === "image" ? <Fragment key={k}>{renderOverlay(k)}<img key="fg" src={doc.fg} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /></Fragment> : renderOverlay(k)))}
+              {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && (k === "product" && doc.fg && doc.bgSource === "image" ? <Fragment key={k}>{renderOverlay(k)}<img key="fg" src={doc.fg} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none", ...(() => { const t = doc.bgT && doc.bgT.src === doc.image ? doc.bgT : { x: 0, y: 0, z: 1 }; const o = `${((1 - t.x) / 2) * 100}% ${((1 - t.y) / 2) * 100}%`; return { objectPosition: o, transformOrigin: o, transform: `scale(${Math.max(1, t.z)})` }; })() }} /></Fragment> : renderOverlay(k)))}
               {doc.stickers.filter((x) => x.repeat === "none").map(renderSticker)}
               {doc.output === "ig-story" && showSafe && (
                 <>
@@ -1269,6 +1284,16 @@ export default function Home() {
 
             {tab === "background" && (
               <>
+                {doc.bgSource === "image" && doc.image && (
+                  <div className="card">
+                    <div className="card-h"><b>Plate position</b><button className={`ghost small ${bgEdit ? "on" : ""}`} onClick={() => setBgEdit((v) => !v)}>{bgEdit ? "Done" : "Edit background"}</button></div>
+                    <p className="hint">{bgEdit ? "Drag the artboard to pan, scroll to zoom. The plate always covers the canvas and never stretches." : "Pan and zoom the scene plate. Kept per artwork and across ratios."}</p>
+                    <Range label="Zoom" unit="%" min={100} max={400} value={Math.round(curBgT().z * 100)} onChange={(v) => setBgT({ z: v / 100 }, "bgz")} />
+                    <Range label="Pan X" unit="" min={-100} max={100} value={Math.round(curBgT().x * 100)} onChange={(v) => setBgT({ x: v / 100 }, "bgx")} />
+                    <Range label="Pan Y" unit="" min={-100} max={100} value={Math.round(curBgT().y * 100)} onChange={(v) => setBgT({ y: v / 100 }, "bgy")} />
+                    <button className="ghost" onClick={() => commit((d) => ({ ...d, bgT: undefined }))}>Reset / fit</button>
+                  </div>
+                )}
                 <div className="seg">
                   {([["create", "Create"], ["library", "Library"], ["upload", "Upload"], ["ai", "AI"]] as const).map(([k, l]) => <button key={k} className={bgMode === k ? "on" : ""} onClick={() => setBgMode(k)}>{l}</button>)}
                 </div>
