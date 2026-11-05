@@ -507,7 +507,9 @@ export default function Home() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "z" && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if (mod && e.key.toLowerCase() === "y" && !typing) { e.preventDefault(); redo(); return; }
-      if (typing || !selected) return;
+      if (typing) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && selSticker) { e.preventDefault(); commit((d) => ({ ...d, stickers: d.stickers.filter((x) => x.uid !== selSticker) })); setSelSticker(null); return; }
+      if (!selected) return;
       const step = e.shiftKey ? 2 : 0.4;
       const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
       if (d) { e.preventDefault(); commit((x) => ({ ...x, t: { ...x.t, [selected]: { ...x.t[selected], x: x.t[selected].x + d[0], y: x.t[selected].y + d[1] } } }), "nudge-" + selected); }
