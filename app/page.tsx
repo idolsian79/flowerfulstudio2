@@ -41,26 +41,32 @@ const remixParts = {
   lens: ["close product portrait", "wide architectural frame", "low hero angle", "macro crop", "candid documentary frame"],
   material: ["translucent acrylic", "brushed chrome", "cool limestone", "high-gloss colour", "water and crushed ice"],
 };
-type OverlayKey = "product" | "radial" | "icon" | "wordmark" | "lockup" | "header" | "sub";
+type OverlayKey = "product" | "radial" | "icon" | "wordmark" | "lockup" | "tagline" | "header" | "sub";
 type MarkColour = "silver" | "white" | "ink" | "flavour";
-const defaultOrder: OverlayKey[] = ["radial", "product", "icon", "wordmark", "lockup", "header", "sub"];
+const defaultOrder: OverlayKey[] = ["radial", "product", "icon", "wordmark", "lockup", "tagline", "header", "sub"];
 // brand mark sources (alpha masks, recoloured at render time)
 const ICON = { src: "/assets/brand-mark-white.png", a: 309 / 275 };
 const WORD = { src: "/assets/brand-wordmark-white.png", a: 1378 / 269 };
+// "drink brighter" set in Fredoka (the brand's rounded display face), lowercase, as on the can
+const TAG = { src: "/assets/brand-tagline-white.png", a: 2449 / 367 };
+// can-flow.png: tagline width = 62% of wordmark width, gap below wordmark = 38% of wordmark height
+const TAG_W = 0.62, TAG_GAP = 0.38, tagW = 0.3;
 const markCss = (m: MarkColour, sku: string) =>
   m === "silver" ? "linear-gradient(160deg,#f2f2f2 0%,#b9b9b9 45%,#e2e2e2 70%,#9d9d9d 100%)" : m === "white" ? "#ffffff" : m === "ink" ? "#241A1E" : sku;
 // lockup geometry as fractions of artboard width (shared by preview and export)
-function lockupGeom(layout: "left" | "above", spacing: number) {
+function lockupGeom(layout: "left" | "above", spacing: number, tag = false) {
   if (layout === "left") {
     // side by side: icon restrained to the wordmark's ascender (cap) height
     const ih = 1, iw = ih * ICON.a, wh = 1, ww = wh * WORD.a, gap = (spacing / 100) * ih;
     const tw = iw + gap + ww, k = 0.5 / tw;
-    return { w: tw * k, h: ih * k, icon: { x: 0, y: 0, w: iw * k, h: ih * k }, word: { x: (iw + gap) * k, y: ((ih - wh) / 2) * k, w: ww * k, h: wh * k } };
+    const tgw = ww * TAG_W, tgh = tgw / TAG.a, th = tag ? ih + TAG_GAP * wh + tgh : ih;
+    return { w: tw * k, h: th * k, icon: { x: 0, y: 0, w: iw * k, h: ih * k }, word: { x: (iw + gap) * k, y: ((ih - wh) / 2) * k, w: ww * k, h: wh * k }, tag: tag ? { x: (iw + gap + (ww - tgw) / 2) * k, y: (ih + TAG_GAP * wh) * k, w: tgw * k, h: tgh * k } : null };
   }
   // stacked (Ian's lockup rule): icon width = 30% of wordmark width, gap = 20% of icon height
   const ih = 1, iw = ih * ICON.a, wh = iw / 0.3 / WORD.a, ww = wh * WORD.a, gap = (spacing / 100) * ih;
   const tw = Math.max(iw, ww), k = 0.4 / tw;
-  return { w: tw * k, h: (ih + gap + wh) * k, icon: { x: ((tw - iw) / 2) * k, y: 0, w: iw * k, h: ih * k }, word: { x: ((tw - ww) / 2) * k, y: (ih + gap) * k, w: ww * k, h: wh * k } };
+  const tgw = ww * TAG_W, tgh = tgw / TAG.a, ty = ih + gap + wh + TAG_GAP * wh;
+  return { w: tw * k, h: (tag ? ty + tgh : ih + gap + wh) * k, icon: { x: ((tw - iw) / 2) * k, y: 0, w: iw * k, h: ih * k }, word: { x: ((tw - ww) / 2) * k, y: (ih + gap) * k, w: ww * k, h: wh * k }, tag: tag ? { x: ((tw - tgw) / 2) * k, y: ty * k, w: tgw * k, h: tgh * k } : null };
 }
 const iconW = 0.3, wordW = 0.44;
 // choosing a logo style also lays it out cleanly above the text (one undo step)
@@ -91,13 +97,14 @@ type Doc = {
   bgPreset: string | null;
   image: string | null;
   fg?: string | null;
-  layers: { background: boolean; wash: boolean; radial: boolean; product: boolean; shadow: boolean; icon: boolean; wordmark: boolean; lockup: boolean; header: boolean; sub: boolean };
+  layers: { background: boolean; wash: boolean; radial: boolean; product: boolean; shadow: boolean; icon: boolean; wordmark: boolean; lockup: boolean; tagline?: boolean; header: boolean; sub: boolean };
   t: Record<OverlayKey, T>;
   header: { text: string; caps: boolean; size: number; align: Align };
   sub: { text: string; custom: boolean; caps: boolean; size: number; align: Align };
   tone: Tone;
   markColour: MarkColour;
-  lockup: { layout: "left" | "above"; spacing: number };
+  lockup: { layout: "left" | "above"; spacing: number; tagline?: boolean };
+  tagColour?: MarkColour;
   bgT?: { src: string; x: number; y: number; z: number };
   order: OverlayKey[];
   carousel: { slides: Slide[]; active: number; size: "ig-square" | "ig-portrait"; base?: { t: Doc["t"]; size: number } };
@@ -120,6 +127,7 @@ const initialDoc: Doc = {
     radial: { x: 76, y: 76, scale: 1 },
     icon: { x: 50, y: 9, scale: 0.5 },
     lockup: { x: 50, y: 9, scale: 1 },
+    tagline: { x: 50, y: 33, scale: 1 },
     wordmark: { x: 50, y: 8, scale: 0.6 },
     header: { x: 50, y: 19, scale: 1 },
     sub: { x: 50, y: 28, scale: 1 },
@@ -141,19 +149,20 @@ const STORE = "flowerful-studio-v3";
 const overlayMeta: Record<OverlayKey, { label: string; layer: keyof Doc["layers"]; tab: Tab }> = {
   sub: { label: "Sub line", layer: "sub", tab: "text" },
   header: { label: "Header", layer: "header", tab: "text" },
-  lockup: { label: "Lockup", layer: "lockup", tab: "brand" },
-  wordmark: { label: "Wordmark", layer: "wordmark", tab: "brand" },
-  icon: { label: "Icon", layer: "icon", tab: "brand" },
+  lockup: { label: "Lockup", layer: "lockup", tab: "text" },
+  tagline: { label: "Tagline", layer: "tagline", tab: "text" },
+  wordmark: { label: "Wordmark", layer: "wordmark", tab: "text" },
+  icon: { label: "Icon", layer: "icon", tab: "text" },
   product: { label: "Can", layer: "product", tab: "can" },
-  radial: { label: "Flower radial", layer: "radial", tab: "brand" },
+  radial: { label: "Flower radial", layer: "radial", tab: "can" },
 };
 const fixedLayers: Array<{ key: keyof Doc["layers"]; label: string; tab: Tab }> = [
   { key: "shadow", label: "Can shadow", tab: "can" },
-  { key: "wash", label: "Colour wash", tab: "brand" },
+  { key: "wash", label: "Colour wash", tab: "can" },
   { key: "background", label: "Background", tab: "background" },
 ];
 type Tab = "set" | "stickers" | "background" | "can" | "text" | "brand" | "carousel" | "motion" | "export";
-const tabs: Array<[Tab, string]> = [["set", "Set"], ["stickers", "Stickers"], ["background", "Background"], ["can", "Can"], ["text", "Text"], ["brand", "Brand"], ["carousel", "Carousel"], ["motion", "Motion"], ["export", "Export"]];
+const tabs: Array<[Tab, string]> = [["set", "Set"], ["stickers", "Stickers"], ["background", "Background"], ["can", "Can"], ["text", "Words & logo"], ["carousel", "Carousel"], ["motion", "Motion"], ["export", "Export"]];
 
 const imgCache = new Map<string, Promise<HTMLImageElement>>();
 const loadImg = (src: string) => {
@@ -792,18 +801,18 @@ export default function Home() {
       if (d.format === "jpg") { c.fillStyle = "#fff"; c.fillRect(0, 0, W, H); }
       await paintBase(c, W, H, d, anim);
       const sku = products[d.product].color;
-      const drawMark = async (src: string, x: number, y: number, w: number, h: number) => {
+      const drawMark = async (src: string, x: number, y: number, w: number, h: number, mc: MarkColour = d.markColour) => {
         const img = await loadImg(src);
         const off = document.createElement("canvas"); off.width = Math.max(1, Math.round(w)); off.height = Math.max(1, Math.round(h));
         const o = off.getContext("2d")!;
         o.drawImage(img, 0, 0, off.width, off.height);
         o.globalCompositeOperation = "source-in";
-        if (d.markColour === "silver") {
+        if (mc === "silver") {
           // same angle and stops as the CSS gradient
           const g = o.createLinearGradient(0, 0, off.width, off.height * 0.6);
           [["#f2f2f2", 0], ["#b9b9b9", 0.45], ["#e2e2e2", 0.7], ["#9d9d9d", 1]].forEach(([c, t]) => g.addColorStop(t as number, c as string));
           o.fillStyle = g;
-        } else o.fillStyle = markCss(d.markColour, sku);
+        } else o.fillStyle = markCss(mc, sku);
         o.fillRect(0, 0, off.width, off.height);
         c.drawImage(off, x, y, w, h);
       };
@@ -843,9 +852,13 @@ export default function Home() {
           const m = k === "icon" ? ICON : WORD, w = W * (k === "icon" ? iconW : wordW) * t.scale, h = w / m.a;
           await drawMark(m.src, cx - w / 2, cy - h / 2, w, h);
         } else if (k === "lockup") {
-          const g = lockupGeom(d.lockup.layout, d.lockup.spacing), s2 = W * t.scale, x0 = cx - (g.w * s2) / 2, y0 = cy - (g.h * s2) / 2;
+          const g = lockupGeom(d.lockup.layout, d.lockup.spacing, !!d.lockup.tagline), s2 = W * t.scale, x0 = cx - (g.w * s2) / 2, y0 = cy - (g.h * s2) / 2;
           await drawMark(ICON.src, x0 + g.icon.x * s2, y0 + g.icon.y * s2, g.icon.w * s2, g.icon.h * s2);
           await drawMark(WORD.src, x0 + g.word.x * s2, y0 + g.word.y * s2, g.word.w * s2, g.word.h * s2);
+          if (g.tag) await drawMark(TAG.src, x0 + g.tag.x * s2, y0 + g.tag.y * s2, g.tag.w * s2, g.tag.h * s2, d.tagColour ?? "flavour");
+        } else if (k === "tagline") {
+          const w = W * tagW * t.scale, h = w / TAG.a;
+          await drawMark(TAG.src, cx - w / 2, cy - h / 2, w, h, d.tagColour ?? "flavour");
         } else if (k === "header" || k === "sub") drawText(k);
       }
       for (const st of d.stickers) if (st.repeat === "none") await drawStickerLayer(c, W, H, d, st);
@@ -971,8 +984,8 @@ export default function Home() {
       </div>
     );
   };  const sel = (k: OverlayKey) => selected === k;
-  const markStyle = (src: string, w: number, h: number): React.CSSProperties => ({
-    width: `${w}cqw`, height: `${h}cqw`, background: markCss(doc.markColour, p.color),
+  const markStyle = (src: string, w: number, h: number, mc: MarkColour = doc.markColour): React.CSSProperties => ({
+    width: `${w}cqw`, height: `${h}cqw`, background: markCss(mc, p.color),
     WebkitMaskImage: `url(${src})`, maskImage: `url(${src})`, WebkitMaskSize: "100% 100%", maskSize: "100% 100%",
   });
   const renderOverlay = (k: OverlayKey) => {
@@ -986,13 +999,15 @@ export default function Home() {
     );
     if (k === "icon") return <Overlay key={k} {...common} className="o-mark"><i style={markStyle(ICON.src, iconW * 100, (iconW * 100) / ICON.a)} /></Overlay>;
     if (k === "wordmark") return <Overlay key={k} {...common} className="o-mark"><i style={markStyle(WORD.src, wordW * 100, (wordW * 100) / WORD.a)} /></Overlay>;
+    if (k === "tagline") return <Overlay key={k} {...common} className="o-mark"><i style={markStyle(TAG.src, tagW * 100, (tagW * 100) / TAG.a, doc.tagColour ?? "flavour")} /></Overlay>;
     if (k === "lockup") {
-      const g = lockupGeom(doc.lockup.layout, doc.lockup.spacing);
+      const g = lockupGeom(doc.lockup.layout, doc.lockup.spacing, !!doc.lockup.tagline);
       return (
         <Overlay key={k} {...common} className="o-mark">
           <div style={{ position: "relative", width: `${g.w * 100}cqw`, height: `${g.h * 100}cqw` }}>
             <i style={{ ...markStyle(ICON.src, g.icon.w * 100, g.icon.h * 100), position: "absolute", left: `${g.icon.x * 100}cqw`, top: `${g.icon.y * 100}cqw` }} />
             <i style={{ ...markStyle(WORD.src, g.word.w * 100, g.word.h * 100), position: "absolute", left: `${g.word.x * 100}cqw`, top: `${g.word.y * 100}cqw` }} />
+            {g.tag && <i style={{ ...markStyle(TAG.src, g.tag.w * 100, g.tag.h * 100, doc.tagColour ?? "flavour"), position: "absolute", left: `${g.tag.x * 100}cqw`, top: `${g.tag.y * 100}cqw` }} />}
           </div>
         </Overlay>
       );
@@ -1460,6 +1475,13 @@ export default function Home() {
                 </div>
                 <button className="ghost wide" onClick={() => setT("product", initialDoc.t.product, "reset" + Date.now())}>Re-centre can</button>
                 <div className="callout"><LockKeyhole /> Can artwork is the locked master. It can be moved and scaled, never redrawn.</div>
+                {((doc.product === "lineup" ? [] : [["radial", "Flower radial"]]) as Array<["icon" | "wordmark" | "radial", string]>).filter(([k]) => k === "radial" || doc.layers[k]).map(([k, l]) => (
+                  <div key={k} className="card">
+                    <div className="card-h"><b>{l}</b><Switch on={doc.layers[k]} onClick={() => toggleLayer(k)} /></div>
+                    {doc.layers[k] && <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t[k].scale * 100)} onChange={(v) => setT(k, { scale: v / 100 })} />}
+                  </div>
+                ))}
+                <div className="card"><div className="card-h"><b>Colour wash</b><Switch on={doc.layers.wash} onClick={() => toggleLayer("wash")} /></div><small>Tints the background in the {p.name} colour.</small></div>
               </>
             )}
 
@@ -1485,6 +1507,11 @@ export default function Home() {
                 <button className="ghost wide" onClick={() => commit((d) => ({ ...d, t: { ...d.t, header: { ...d.t.header, x: 50 }, sub: { ...d.t.sub, x: 50, y: d.t.header.y + (linesOf(d.header.text, true).length * d.header.size * 1.02 * (out.w / out.h)) / 2 + 4 } } }))}>
                   Stack sub line under header
                 </button>
+                <Group label="Text colour">
+                  <div className="seg">
+                    {(["white", "silver", "black"] as Tone[]).map((x) => <button key={x} className={doc.tone === x ? "on" : ""} onClick={() => commit((d) => ({ ...d, tone: x }))}><i className="dot" style={{ background: toneHex[x] }} /> {x[0].toUpperCase() + x.slice(1)}</button>)}
+                  </div>
+                </Group>
                 <Group label="Header lines">
                   <div className="seg small">{copyGroups.map((g) => <button key={g} className={copyTab === g ? "on" : ""} onClick={() => setCopyTab(g)}>{g}</button>)}</div>
                   <div className="lines">
@@ -1500,16 +1527,21 @@ export default function Home() {
                     {subLines[copyTab].map((l) => <button key={l} className={doc.sub.text === l ? "on" : ""} onClick={() => commit((d) => ({ ...d, sub: { ...d.sub, text: l, custom: true }, layers: { ...d.layers, sub: true } }))}>{l}</button>)}
                   </div>
                 </Group>
-              </>
-            )}
-
-            {tab === "brand" && (
-              <>
-                <Group label="Text colour">
-                  <div className="seg">
-                    {(["white", "silver", "black"] as Tone[]).map((x) => <button key={x} className={doc.tone === x ? "on" : ""} onClick={() => commit((d) => ({ ...d, tone: x }))}><i className="dot" style={{ background: toneHex[x] }} /> {x[0].toUpperCase() + x.slice(1)}</button>)}
+                <div className="ph" style={{ marginTop: 18 }}>Tagline & logo</div>
+                <div className="card">
+                  <div className="card-h"><b>Tagline: drink brighter</b></div>
+                  <div className="row">
+                    <button className={`ghost small ${doc.lockup.tagline ? "on" : ""}`} onClick={() => commit((d) => ({ ...d, lockup: { ...d.lockup, tagline: !d.lockup.tagline }, layers: { ...d.layers, lockup: true, icon: false, wordmark: false } }))}>{doc.lockup.tagline ? "Remove from lockup" : "Add under lockup"}</button>
+                    <button className={`ghost small ${doc.layers.tagline ? "on" : ""}`} onClick={() => toggleLayer("tagline")}>{doc.layers.tagline ? "Remove layer" : "Add as own layer"}</button>
                   </div>
-                </Group>
+                  <div className="seg small">
+                    {([["flavour", "Flavour"], ["white", "White"], ["ink", "Ink"], ["silver", "Silver"]] as Array<[MarkColour, string]>).map(([x, l]) => (
+                      <button key={x} className={(doc.tagColour ?? "flavour") === x ? "on" : ""} onClick={() => commit((d) => ({ ...d, tagColour: x }))}><i className="dot" style={{ background: markCss(x, p.color) }} /> {l}</button>
+                    ))}
+                  </div>
+                  {doc.layers.tagline && <Range label="Tagline size" unit="%" min={20} max={300} value={Math.round(doc.t.tagline.scale * 100)} onChange={(v) => setT("tagline", { scale: v / 100 })} />}
+                  <small className="muted">Set in Fredoka like the can. In the lockup it sits under the wordmark at the can's proportions.</small>
+                </div>
                 <Group label="Logo colour">
                   <div className="seg">
                     {([["silver", "Matte silver"], ["white", "White"], ["ink", "Ink"], ["flavour", p.name === "LINE-UP" ? "Flavour" : p.name[0] + p.name.slice(1).toLowerCase()]] as Array<[MarkColour, string]>).map(([x, l]) => (
@@ -1537,15 +1569,15 @@ export default function Home() {
                     <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t.lockup.scale * 100)} onChange={(v) => setT("lockup", { scale: v / 100 })} />
                   </div>
                 )}
-                {([["icon", "Icon"], ["wordmark", "Wordmark"], ...(doc.product === "lineup" ? [] : [["radial", "Flower radial"]])] as Array<["icon" | "wordmark" | "radial", string]>).filter(([k]) => k === "radial" || doc.layers[k]).map(([k, l]) => (
+                {([["icon", "Icon"], ["wordmark", "Wordmark"]] as Array<["icon" | "wordmark" | "radial", string]>).filter(([k]) => k === "radial" || doc.layers[k]).map(([k, l]) => (
                   <div key={k} className="card">
                     <div className="card-h"><b>{l}</b><Switch on={doc.layers[k]} onClick={() => toggleLayer(k)} /></div>
                     {doc.layers[k] && <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t[k].scale * 100)} onChange={(v) => setT(k, { scale: v / 100 })} />}
                   </div>
                 ))}
-                <div className="card"><div className="card-h"><b>Colour wash</b><Switch on={doc.layers.wash} onClick={() => toggleLayer("wash")} /></div><small>Tints the background in the {p.name} colour.</small></div>
               </>
             )}
+
 
             {tab === "carousel" && (
               <>
