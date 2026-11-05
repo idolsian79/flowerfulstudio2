@@ -494,9 +494,10 @@ export default function Home() {
   const uploadRef = useRef<HTMLInputElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const [bgEdit, setBgEdit] = useState(false);
-  const bgDrag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+  const bgDims = useRef<{ w: number; h: number } | null>(null);
+  const bgDrag = useRef<{ px: number; py: number; x: number; y: number; z: number } | null>(null);
   const curBgT = () => (doc.bgT && doc.bgT.src === doc.image ? doc.bgT : { src: doc.image ?? "", x: 0, y: 0, z: 1 });
-  const setBgT = (v: Partial<{ x: number; y: number; z: number }>, key: string) => commit((d) => { const b = d.bgT && d.bgT.src === d.image ? d.bgT : { src: d.image ?? "", x: 0, y: 0, z: 1 }; const n = { ...b, ...v }; n.x = Math.max(-1, Math.min(1, n.x)); n.y = Math.max(-1, Math.min(1, n.y)); n.z = Math.max(1, Math.min(4, n.z)); return { ...d, bgT: n }; }, key);
+  const setBgT = (v: Partial<{ x: number; y: number; z: number }>, key: string) => commit((d) => { const b = d.bgT && d.bgT.src === d.image ? d.bgT : { src: d.image ?? "", x: 0, y: 0, z: 1 }; const n = { ...b, ...v }; n.x = Math.max(-1, Math.min(1, n.x)); n.y = Math.max(-1, Math.min(1, n.y)); n.z = Math.max(1, Math.min(4, n.z)); if ((v.x !== undefined || v.y !== undefined) && v.z === undefined && n.z < 1.02) n.z = 1.15; return { ...d, bgT: n }; }, key);
   const boardRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const p = products[doc.product];
@@ -600,7 +601,7 @@ export default function Home() {
     else if (d.layers.background) {
       if (d.bgSource === "image" && d.image) {
         const bg = await loadImg(d.image);
-        const g = bgPlace(d, W, H, bg.width, bg.height);
+        const g = bgPlace(d, W, H, bg.width, bg.height); bgDims.current = { w: bg.width, h: bg.height };
         c.drawImage(bg, g.x, g.y, g.w, g.h);
       } else drawBackground(c, W, H, bg, lp);
     }
@@ -1173,10 +1174,27 @@ export default function Home() {
             ))}
           </div>
           <div className={`shell ${bgEdit ? "bg-edit" : ""}`} ref={shellRef} style={bgEdit ? { cursor: "grab" } : undefined}
-            onPointerDown={(e) => { setSelected(null); setSelSticker(null); if (bgEdit && doc.bgSource === "image" && doc.image) { const b = curBgT(); bgDrag.current = { px: e.clientX, py: e.clientY, x: b.x, y: b.y }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } }}
-            onPointerMove={(e) => { const g = bgDrag.current, el = shellRef.current; if (!g || !el) return; const r = el.getBoundingClientRect(), z = Math.max(1, curBgT().z), k = 2 / Math.max(0.05, z * 1.4 - 1); setBgT({ x: g.x + ((e.clientX - g.px) / r.width) * k, y: g.y + ((e.clientY - g.py) / r.height) * k }, "bgpan"); }}
+            onPointerDown={(e) => {
+              setSelected(null); setSelSticker(null);
+              // drag the plate: in edit mode anywhere, otherwise on empty canvas (no layer under the pointer)
+              const empty = e.target === baseRef.current || e.target === boardRef.current;
+              if ((bgEdit || empty) && doc.bgSource === "image" && doc.image && doc.layers.background) {
+                let b = curBgT();
+                if (b.z < 1.02) { b = { ...b, z: 1.15 }; setBgT({ z: 1.15 }, "bgpan"); } // a plate that exactly fits has nothing to pan, so give it a little room
+                bgDrag.current = { px: e.clientX, py: e.clientY, x: b.x, y: b.y, z: b.z };
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              }
+            }}
+            onPointerMove={(e) => {
+              const g = bgDrag.current, el = boardRef.current; if (!g || !el) return;
+              const r = el.getBoundingClientRect(), dm = bgDims.current ?? { w: r.width, h: r.height };
+              const s = Math.max(r.width / dm.w, r.height / dm.h) * g.z, sx = (dm.w * s) / r.width - 1, sy = (dm.h * s) / r.height - 1;
+              setBgT({ x: sx > 0.001 ? g.x + (2 * (e.clientX - g.px)) / r.width / sx : g.x, y: sy > 0.001 ? g.y + (2 * (e.clientY - g.py)) / r.height / sy : g.y }, "bgpan");
+            }}
             onPointerUp={() => { bgDrag.current = null; }}
+            onDoubleClick={(e) => { if ((e.target === baseRef.current || e.target === boardRef.current || e.target === shellRef.current || bgEdit) && doc.bgSource === "image" && doc.image) { setBgEdit(true); setTab("background"); } }}
             onWheel={(e) => { if (bgEdit && doc.bgSource === "image" && doc.image) setBgT({ z: curBgT().z * (e.deltaY < 0 ? 1.05 : 1 / 1.05) }, "bgzoom"); }}>
+            {bgEdit && <button className="primary bg-done" onPointerDown={(e) => e.stopPropagation()} onClick={() => setBgEdit(false)}>Done moving background</button>}
             <div className="artboard" ref={boardRef} style={{ width: board.w, height: board.h }}>
               <canvas ref={baseRef} className="base" />
               {doc.order.map((k) => doc.layers[overlayMeta[k].layer] && (k === "product" && doc.fg && doc.bgSource === "image" ? <Fragment key={k}>{renderOverlay(k)}<img key="fg" src={doc.fg} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none", ...(() => { const t = doc.bgT && doc.bgT.src === doc.image ? doc.bgT : { x: 0, y: 0, z: 1 }; const o = `${((1 - t.x) / 2) * 100}% ${((1 - t.y) / 2) * 100}%`; return { objectPosition: o, transformOrigin: o, transform: `scale(${Math.max(1, t.z)})` }; })() }} /></Fragment> : renderOverlay(k)))}
@@ -1302,8 +1320,8 @@ export default function Home() {
               <>
                 {doc.bgSource === "image" && doc.image && (
                   <div className="card">
-                    <div className="card-h"><b>Plate position</b><button className={`ghost small ${bgEdit ? "on" : ""}`} onClick={() => setBgEdit((v) => !v)}>{bgEdit ? "Done" : "Edit background"}</button></div>
-                    <p className="hint">{bgEdit ? "Drag the artboard to pan, scroll to zoom. The plate always covers the canvas and never stretches." : "Pan and zoom the scene plate. Kept per artwork and across ratios."}</p>
+                    <div className="card-h"><b>Plate position</b><button className={`ghost small ${bgEdit ? "on" : ""}`} onClick={() => setBgEdit((v) => !v)}>{bgEdit ? "Done" : "Move background"}</button></div>
+                    <p className="hint">{bgEdit ? "Drag the artboard to pan, scroll to zoom. The plate always covers the canvas and never stretches." : "Drag any empty part of the artboard to move the plate, or double-click it for move mode. Kept per artwork and across ratios."}</p>
                     <Range label="Zoom" unit="%" min={100} max={400} value={Math.round(curBgT().z * 100)} onChange={(v) => setBgT({ z: v / 100 }, "bgz")} />
                     <Range label="Pan X" unit="" min={-100} max={100} value={Math.round(curBgT().x * 100)} onChange={(v) => setBgT({ x: v / 100 }, "bgx")} />
                     <Range label="Pan Y" unit="" min={-100} max={100} value={Math.round(curBgT().y * 100)} onChange={(v) => setBgT({ y: v / 100 }, "bgy")} />
