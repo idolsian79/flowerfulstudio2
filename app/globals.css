@@ -211,4 +211,7 @@ textarea.big{font-family:var(--display);font-size:17px;font-weight:500;line-heig
 .choice button b{font-size:13.5px}.choice button small{color:var(--soft);font-size:12px}.choice button.on{outline:2px solid var(--sel);background:#F4F1FF}.choice button:disabled{opacity:.45;cursor:not-allowed}
 .wiz-btn{border:1px solid var(--sel)!important;color:var(--sel)!important}
 
-.shell.bg-edit * { pointer-events: none; }
+.shell.bg-edit .artboard * { pointer-events: none; }
+.shell.bg-edit .artboard { outline: 2px dashed #0066FF; outline-offset: 3px; }
+.shell { position: relative; }
+.bg-done { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50; }
