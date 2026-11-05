@@ -56,7 +56,8 @@ function lockupGeom(layout: "left" | "above", spacing: number) {
     const tw = iw + gap + ww, k = 0.5 / tw;
     return { w: tw * k, h: ih * k, icon: { x: 0, y: 0, w: iw * k, h: ih * k }, word: { x: (iw + gap) * k, y: ((ih - wh) / 2) * k, w: ww * k, h: wh * k } };
   }
-  const ih = 1, iw = ih * ICON.a, wh = 0.42, ww = wh * WORD.a, gap = (spacing / 100) * ih;
+  // stacked: icon about 43% of wordmark width, gap 27% of icon height by default
+  const ih = 1, iw = ih * ICON.a, wh = 0.51, ww = wh * WORD.a, gap = (spacing / 100) * ih;
   const tw = Math.max(iw, ww), k = 0.4 / tw;
   return { w: tw * k, h: (ih + gap + wh) * k, icon: { x: ((tw - iw) / 2) * k, y: 0, w: iw * k, h: ih * k }, word: { x: ((tw - ww) / 2) * k, y: (ih + gap) * k, w: ww * k, h: wh * k } };
 }
@@ -1504,7 +1505,7 @@ export default function Home() {
                   <div className="card">
                     <div className="card-h"><b>Lockup</b><Switch on onClick={() => toggleLayer("lockup")} /></div>
                     <div className="seg">
-                      {([["left", "Icon left"], ["above", "Icon above"]] as const).map(([k, l]) => <button key={k} className={doc.lockup.layout === k ? "on" : ""} onClick={() => commit((d) => applyLogoStyle({ ...d, lockup: { ...d.lockup, layout: k } }, "lockup"))}>{l}</button>)}
+                      {([["left", "Icon left"], ["above", "Icon above"]] as const).map(([k, l]) => <button key={k} className={doc.lockup.layout === k ? "on" : ""} onClick={() => commit((d) => applyLogoStyle({ ...d, lockup: { ...d.lockup, layout: k, spacing: k === "above" ? 27 : 22 } }, "lockup"))}>{l}</button>)}
                     </div>
                     <Range label="Spacing" unit="%" min={0} max={80} value={doc.lockup.spacing} onChange={(v) => commit((d) => ({ ...d, lockup: { ...d.lockup, spacing: v } }), "lsp")} />
                     <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t.lockup.scale * 100)} onChange={(v) => setT("lockup", { scale: v / 100 })} />
