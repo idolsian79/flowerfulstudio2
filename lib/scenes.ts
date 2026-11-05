@@ -469,8 +469,8 @@ export const scenes: Scene[] = [
   "ig-story": {
    "src": "/library/il-flow-hero-story.jpg",
    "can": {
-    "x": 57.3,
-    "y": 58.0,
+    "x": 56.8,
+    "y": 54.5,
     "scale": 0.304
    },
    "fg": "/library/il-flow-hero-story-fg.png",
@@ -529,8 +529,8 @@ export const scenes: Scene[] = [
   "ig-story": {
    "src": "/library/il-flourish-hero-story.jpg",
    "can": {
-    "x": 50.5,
-    "y": 58.4,
+    "x": 50.3,
+    "y": 63.1,
     "scale": 0.315
    },
    "fg": null,
@@ -678,6 +678,66 @@ export const scenes: Scene[] = [
   ],
   "sub": "Chrysanthemum & Honey",
   "format": "post"
+ }
+},
+{
+ "id": "il-range-hero",
+ "group": "Illustrated",
+ "flavour": "lineup",
+ "src": "/library/il-range-hero.jpg",
+ "fg": null,
+ "can": {
+  "x": 51.0,
+  "y": 58.0,
+  "scale": 0.316
+ },
+ "light": "left",
+ "kb": 300,
+ "hero": true,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/il-range-hero.jpg",
+   "can": {
+    "x": 51.0,
+    "y": 58.0,
+    "scale": 0.316
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/il-range-hero-story.jpg",
+   "can": {
+    "x": 50.0,
+    "y": 59.9,
+    "scale": 0.25
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/il-range-hero-square.jpg",
+   "can": {
+    "x": 51.0,
+    "y": 68.6,
+    "scale": 0.336
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Four worlds, one horizon: the roselle river runs into the butterfly pea bloom, the saffron lighthouse and the chrysanthemum balloon. The whole range on one ledge.",
+  "headers": [
+   "Pick Your Mood",
+   "Four Flowers, One Vibe",
+   "Collect The Set"
+  ],
+  "sub": "FLOW · FLOURISH · FOCUS · FLOAT",
+  "format": "post (hero)"
  }
 },
 {
