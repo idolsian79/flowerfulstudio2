@@ -686,44 +686,28 @@ export const scenes: Scene[] = [
  "flavour": "lineup",
  "src": "/library/il-range-hero.jpg",
  "fg": null,
- "can": {
-  "x": 51.0,
-  "y": 58.0,
-  "scale": 0.316
- },
+ "can": {"x": 54, "y": 66, "scale": 0.55},
  "light": "left",
  "kb": 300,
  "hero": true,
  "formats": {
   "ig-portrait": {
    "src": "/library/il-range-hero.jpg",
-   "can": {
-    "x": 51.0,
-    "y": 58.0,
-    "scale": 0.316
-   },
+   "can": {"x": 54, "y": 66, "scale": 0.55},
    "fg": null,
    "header_y": 11,
    "sub_y": 93
   },
   "ig-story": {
    "src": "/library/il-range-hero-story.jpg",
-   "can": {
-    "x": 50.0,
-    "y": 59.9,
-    "scale": 0.25
-   },
+   "can": {"x": 54, "y": 66, "scale": 0.55},
    "fg": null,
    "header_y": 19,
    "sub_y": 79
   },
   "ig-square": {
    "src": "/library/il-range-hero-square.jpg",
-   "can": {
-    "x": 51.0,
-    "y": 68.6,
-    "scale": 0.336
-   },
+   "can": {"x": 54, "y": 66, "scale": 0.55},
    "fg": null,
    "header_y": 9,
    "sub_y": 94
@@ -1398,6 +1382,246 @@ export const scenes: Scene[] = [
   ],
   "sub": "Chrysanthemum & Honey",
   "format": "carousel slot 4"
+ }
+},
+{
+ "id": "fdv-flow",
+ "group": "Floral photo",
+ "flavour": "flow",
+ "src": "/library/fdv-flow.jpg",
+ "fg": null,
+ "can": {
+  "x": 49.8,
+  "y": 60.6,
+  "scale": 0.364
+ },
+ "light": "left",
+ "kb": 300,
+ "hero": true,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/fdv-flow.jpg",
+   "can": {
+    "x": 49.8,
+    "y": 60.6,
+    "scale": 0.364
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/fdv-flow-story.jpg",
+   "can": {
+    "x": 49.8,
+    "y": 59.1,
+    "scale": 0.256
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/fdv-flow-square.jpg",
+   "can": {
+    "x": 49.8,
+    "y": 63.2,
+    "scale": 0.455
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Fleur de Ville style floral installation photograph, FLOW.",
+  "headers": [
+   "Go With The Flow",
+   "Petal Soft",
+   "Drift Mode"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "post (photo)"
+ }
+},
+{
+ "id": "fdv-flourish",
+ "group": "Floral photo",
+ "flavour": "flourish",
+ "src": "/library/fdv-flourish.jpg",
+ "fg": null,
+ "can": {
+  "x": 68.9,
+  "y": 62.0,
+  "scale": 0.325
+ },
+ "light": "left",
+ "kb": 300,
+ "hero": true,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/fdv-flourish.jpg",
+   "can": {
+    "x": 68.9,
+    "y": 62.0,
+    "scale": 0.325
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/fdv-flourish-story.jpg",
+   "can": {
+    "x": 68.9,
+    "y": 71.0,
+    "scale": 0.228
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/fdv-flourish-square.jpg",
+   "can": {
+    "x": 68.9,
+    "y": 65.0,
+    "scale": 0.406
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Fleur de Ville style floral installation photograph, FLOURISH.",
+  "headers": [
+   "In Full Bloom",
+   "Your Stage",
+   "Bloom Season"
+  ],
+  "sub": "Butterfly Pea & Raspberry",
+  "format": "post (photo)"
+ }
+},
+{
+ "id": "fdv-focus",
+ "group": "Floral photo",
+ "flavour": "focus",
+ "src": "/library/fdv-focus.jpg",
+ "fg": null,
+ "can": {
+  "x": 40.2,
+  "y": 74.9,
+  "scale": 0.364
+ },
+ "light": "left",
+ "kb": 300,
+ "hero": true,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/fdv-focus.jpg",
+   "can": {
+    "x": 40.2,
+    "y": 74.9,
+    "scale": 0.364
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/fdv-focus-story.jpg",
+   "can": {
+    "x": 40.2,
+    "y": 62.0,
+    "scale": 0.256
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/fdv-focus-square.jpg",
+   "can": {
+    "x": 40.2,
+    "y": 63.2,
+    "scale": 0.455
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Fleur de Ville style floral installation photograph, FOCUS.",
+  "headers": [
+   "One Thread. Total Focus.",
+   "Find Your Light",
+   "Locked On"
+  ],
+  "sub": "Saffron & Cardamom",
+  "format": "post (photo)"
+ }
+},
+{
+ "id": "fdv-float",
+ "group": "Floral photo",
+ "flavour": "float",
+ "src": "/library/fdv-float.jpg",
+ "fg": null,
+ "can": {
+  "x": 68.1,
+  "y": 61.0,
+  "scale": 0.301
+ },
+ "light": "left",
+ "kb": 300,
+ "hero": true,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/fdv-float.jpg",
+   "can": {
+    "x": 68.1,
+    "y": 61.0,
+    "scale": 0.301
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/fdv-float-story.jpg",
+   "can": {
+    "x": 79.1,
+    "y": 65.1,
+    "scale": 0.232
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/fdv-float-square.jpg",
+   "can": {
+    "x": 68.1,
+    "y": 51.1,
+    "scale": 0.34
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Fleur de Ville style floral installation photograph, FLOAT.",
+  "headers": [
+   "Sky High, Soft Landing",
+   "Float On",
+   "Head In The Clouds"
+  ],
+  "sub": "Chrysanthemum & Honey",
+  "format": "post (photo)"
  }
 }
 ];

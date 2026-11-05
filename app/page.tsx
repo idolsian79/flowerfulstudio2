@@ -1318,7 +1318,7 @@ export default function Home() {
                 {bgMode === "library" && (
                   <>
                     <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Cover scenes also add the approved Flowerful lockup as the masthead, plus an editable cover line.</p>
-                    {["Illustrated", "Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
+                    {["Illustrated", "Floral photo", "Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
                       const list = scenes.filter((x) => x.group === g).sort((a, b) => (Number(!!b.hero) - Number(!!a.hero)) || (FLAVOUR_ORDER.indexOf(a.flavour) - FLAVOUR_ORDER.indexOf(b.flavour)));
                       if (!list.length) return null;
                       return (
