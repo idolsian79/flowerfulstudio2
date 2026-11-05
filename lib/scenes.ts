@@ -441,6 +441,66 @@ export const scenes: Scene[] = [
   }
  },
 {
+ "id": "il-flow-hero",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-hero.jpg",
+ "fg": "/library/il-flow-hero-fg.png",
+ "can": {
+  "x": 57.3,
+  "y": 62.1,
+  "scale": 0.412
+ },
+ "light": "left",
+ "kb": 327,
+ "hero": true,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/il-flow-hero.jpg",
+   "can": {
+    "x": 57.3,
+    "y": 62.1,
+    "scale": 0.412
+   },
+   "fg": "/library/il-flow-hero-fg.png",
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/il-flow-hero-story.jpg",
+   "can": {
+    "x": 57.3,
+    "y": 58.0,
+    "scale": 0.304
+   },
+   "fg": "/library/il-flow-hero-story-fg.png",
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/il-flow-hero-square.jpg",
+   "can": {
+    "x": 57.3,
+    "y": 65.2,
+    "scale": 0.437
+   },
+   "fg": "/library/il-flow-hero-square-fg.png",
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "A hibiscus-headed swimmer rides a river of roselle petals that curls right round the can.",
+  "headers": [
+   "Go With The Flow",
+   "Ride The Petal Wave",
+   "Warm Current Only"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "post (hero)"
+ }
+},
+{
  "id": "il-flourish-hero",
  "group": "Illustrated",
  "flavour": "flourish",
@@ -507,19 +567,19 @@ export const scenes: Scene[] = [
  "src": "/library/il-focus-hero.jpg",
  "fg": null,
  "can": {
-  "x": 50.0,
-  "y": 64.8,
+  "x": 44.5,
+  "y": 61.1,
   "scale": 0.427
  },
  "light": "left",
- "kb": 235,
+ "kb": 261,
  "hero": true,
  "formats": {
   "ig-portrait": {
    "src": "/library/il-focus-hero.jpg",
    "can": {
-    "x": 50.0,
-    "y": 64.8,
+    "x": 44.5,
+    "y": 61.1,
     "scale": 0.427
    },
    "fg": null,
@@ -529,8 +589,8 @@ export const scenes: Scene[] = [
   "ig-story": {
    "src": "/library/il-focus-hero-story.jpg",
    "can": {
-    "x": 50.0,
-    "y": 59.9,
+    "x": 46.0,
+    "y": 58.5,
     "scale": 0.315
    },
    "fg": null,
@@ -540,8 +600,8 @@ export const scenes: Scene[] = [
   "ig-square": {
    "src": "/library/il-focus-hero-square.jpg",
    "can": {
-    "x": 50.0,
-    "y": 64.6,
+    "x": 44.5,
+    "y": 64.7,
     "scale": 0.453
    },
    "fg": null,
@@ -550,73 +610,13 @@ export const scenes: Scene[] = [
   }
  },
  "copy": {
-  "story": "A saffron crocus lighthouse sends one golden thread across a calm night sea. One beam, one focus.",
+  "story": "A saffron crocus lighthouse at dusk drops one golden beam straight onto the can. One light, one focus.",
   "headers": [
    "One Thread. Total Focus.",
    "Find Your Light",
    "Locked On"
   ],
   "sub": "Saffron & Cardamom",
-  "format": "post (hero)"
- }
-},
-{
- "id": "il-flow-hero",
- "group": "Illustrated",
- "flavour": "flow",
- "src": "/library/il-flow-hero.jpg",
- "fg": "/library/il-flow-hero-fg.png",
- "can": {
-  "x": 57.3,
-  "y": 62.1,
-  "scale": 0.412
- },
- "light": "left",
- "kb": 327,
- "hero": true,
- "formats": {
-  "ig-portrait": {
-   "src": "/library/il-flow-hero.jpg",
-   "can": {
-    "x": 57.3,
-    "y": 62.1,
-    "scale": 0.412
-   },
-   "fg": "/library/il-flow-hero-fg.png",
-   "header_y": 11,
-   "sub_y": 93
-  },
-  "ig-story": {
-   "src": "/library/il-flow-hero-story.jpg",
-   "can": {
-    "x": 57.3,
-    "y": 58.0,
-    "scale": 0.304
-   },
-   "fg": "/library/il-flow-hero-story-fg.png",
-   "header_y": 19,
-   "sub_y": 79
-  },
-  "ig-square": {
-   "src": "/library/il-flow-hero-square.jpg",
-   "can": {
-    "x": 57.3,
-    "y": 65.2,
-    "scale": 0.437
-   },
-   "fg": "/library/il-flow-hero-square-fg.png",
-   "header_y": 9,
-   "sub_y": 94
-  }
- },
- "copy": {
-  "story": "A hibiscus-headed swimmer rides a river of roselle petals that curls right round the can.",
-  "headers": [
-   "Go With The Flow",
-   "Ride The Petal Wave",
-   "Warm Current Only"
-  ],
-  "sub": "Roselle & Pomegranate",
   "format": "post (hero)"
  }
 },
@@ -678,6 +678,186 @@ export const scenes: Scene[] = [
   ],
   "sub": "Chrysanthemum & Honey",
   "format": "post"
+ }
+},
+{
+ "id": "il-flow-rooftop",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-rooftop.jpg",
+ "fg": null,
+ "can": {
+  "x": 42.5,
+  "y": 56.7,
+  "scale": 0.382
+ },
+ "light": "left",
+ "kb": 323,
+ "hero": false,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/il-flow-rooftop.jpg",
+   "can": {
+    "x": 42.5,
+    "y": 56.7,
+    "scale": 0.382
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/il-flow-rooftop-story.jpg",
+   "can": {
+    "x": 42.5,
+    "y": 54.2,
+    "scale": 0.283
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/il-flow-rooftop-square.jpg",
+   "can": {
+    "x": 42.5,
+    "y": 66.2,
+    "scale": 0.406
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Rooftop garden at golden hour, hibiscus pots, magenta tiles, two friends watching the sun drop.",
+  "headers": [
+   "Golden Hour Unlocked",
+   "Stay For The Sunset",
+   "Wind Down, Glow Up"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "post"
+ }
+},
+{
+ "id": "il-flow-festival",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-festival.jpg",
+ "fg": null,
+ "can": {
+  "x": 62.0,
+  "y": 65.3,
+  "scale": 0.412
+ },
+ "light": "left",
+ "kb": 294,
+ "hero": false,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/il-flow-festival.jpg",
+   "can": {
+    "x": 62.0,
+    "y": 65.3,
+    "scale": 0.412
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/il-flow-festival-story.jpg",
+   "can": {
+    "x": 62.0,
+    "y": 60.3,
+    "scale": 0.304
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/il-flow-festival-square.jpg",
+   "can": {
+    "x": 62.0,
+    "y": 65.1,
+    "scale": 0.437
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Mid-spin dancer, skirt of hibiscus petals, ribbons of motion. Festival energy, pure flow.",
+  "headers": [
+   "Move Like Nobody's Watching",
+   "Spin Cycle",
+   "Vibe In Motion"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "story"
+ }
+},
+{
+ "id": "il-flow-beach",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-beach.jpg",
+ "fg": null,
+ "can": {
+  "x": 47.9,
+  "y": 65.3,
+  "scale": 0.397
+ },
+ "light": "left",
+ "kb": 217,
+ "hero": false,
+ "formats": {
+  "ig-portrait": {
+   "src": "/library/il-flow-beach.jpg",
+   "can": {
+    "x": 47.9,
+    "y": 65.3,
+    "scale": 0.397
+   },
+   "fg": null,
+   "header_y": 11,
+   "sub_y": 93
+  },
+  "ig-story": {
+   "src": "/library/il-flow-beach-story.jpg",
+   "can": {
+    "x": 47.9,
+    "y": 60.3,
+    "scale": 0.293
+   },
+   "fg": null,
+   "header_y": 19,
+   "sub_y": 79
+  },
+  "ig-square": {
+   "src": "/library/il-flow-beach-square.jpg",
+   "can": {
+    "x": 47.9,
+    "y": 65.7,
+    "scale": 0.422
+   },
+   "fg": null,
+   "header_y": 9,
+   "sub_y": 94
+  }
+ },
+ "copy": {
+  "story": "Post-surf walk-up, tilted parasol, striped sea. Salty, sunny, still moving.",
+  "headers": [
+   "Surf's Up, Mood's Up",
+   "Heat Wave Season",
+   "Catch The Next One"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "carousel slot 3"
  }
 },
 {
@@ -1038,186 +1218,6 @@ export const scenes: Scene[] = [
   ],
   "sub": "Saffron & Cardamom",
   "format": "post"
- }
-},
-{
- "id": "il-flow-rooftop",
- "group": "Illustrated",
- "flavour": "flow",
- "src": "/library/il-flow-rooftop.jpg",
- "fg": null,
- "can": {
-  "x": 42.5,
-  "y": 56.7,
-  "scale": 0.382
- },
- "light": "left",
- "kb": 323,
- "hero": false,
- "formats": {
-  "ig-portrait": {
-   "src": "/library/il-flow-rooftop.jpg",
-   "can": {
-    "x": 42.5,
-    "y": 56.7,
-    "scale": 0.382
-   },
-   "fg": null,
-   "header_y": 11,
-   "sub_y": 93
-  },
-  "ig-story": {
-   "src": "/library/il-flow-rooftop-story.jpg",
-   "can": {
-    "x": 42.5,
-    "y": 54.2,
-    "scale": 0.283
-   },
-   "fg": null,
-   "header_y": 19,
-   "sub_y": 79
-  },
-  "ig-square": {
-   "src": "/library/il-flow-rooftop-square.jpg",
-   "can": {
-    "x": 42.5,
-    "y": 66.2,
-    "scale": 0.406
-   },
-   "fg": null,
-   "header_y": 9,
-   "sub_y": 94
-  }
- },
- "copy": {
-  "story": "Rooftop garden at golden hour, hibiscus pots, magenta tiles, two friends watching the sun drop.",
-  "headers": [
-   "Golden Hour Unlocked",
-   "Stay For The Sunset",
-   "Wind Down, Glow Up"
-  ],
-  "sub": "Roselle & Pomegranate",
-  "format": "post"
- }
-},
-{
- "id": "il-flow-festival",
- "group": "Illustrated",
- "flavour": "flow",
- "src": "/library/il-flow-festival.jpg",
- "fg": null,
- "can": {
-  "x": 62.0,
-  "y": 65.3,
-  "scale": 0.412
- },
- "light": "left",
- "kb": 294,
- "hero": false,
- "formats": {
-  "ig-portrait": {
-   "src": "/library/il-flow-festival.jpg",
-   "can": {
-    "x": 62.0,
-    "y": 65.3,
-    "scale": 0.412
-   },
-   "fg": null,
-   "header_y": 11,
-   "sub_y": 93
-  },
-  "ig-story": {
-   "src": "/library/il-flow-festival-story.jpg",
-   "can": {
-    "x": 62.0,
-    "y": 60.3,
-    "scale": 0.304
-   },
-   "fg": null,
-   "header_y": 19,
-   "sub_y": 79
-  },
-  "ig-square": {
-   "src": "/library/il-flow-festival-square.jpg",
-   "can": {
-    "x": 62.0,
-    "y": 65.1,
-    "scale": 0.437
-   },
-   "fg": null,
-   "header_y": 9,
-   "sub_y": 94
-  }
- },
- "copy": {
-  "story": "Mid-spin dancer, skirt of hibiscus petals, ribbons of motion. Festival energy, pure flow.",
-  "headers": [
-   "Move Like Nobody's Watching",
-   "Spin Cycle",
-   "Vibe In Motion"
-  ],
-  "sub": "Roselle & Pomegranate",
-  "format": "story"
- }
-},
-{
- "id": "il-flow-beach",
- "group": "Illustrated",
- "flavour": "flow",
- "src": "/library/il-flow-beach.jpg",
- "fg": null,
- "can": {
-  "x": 47.9,
-  "y": 65.3,
-  "scale": 0.397
- },
- "light": "left",
- "kb": 217,
- "hero": false,
- "formats": {
-  "ig-portrait": {
-   "src": "/library/il-flow-beach.jpg",
-   "can": {
-    "x": 47.9,
-    "y": 65.3,
-    "scale": 0.397
-   },
-   "fg": null,
-   "header_y": 11,
-   "sub_y": 93
-  },
-  "ig-story": {
-   "src": "/library/il-flow-beach-story.jpg",
-   "can": {
-    "x": 47.9,
-    "y": 60.3,
-    "scale": 0.293
-   },
-   "fg": null,
-   "header_y": 19,
-   "sub_y": 79
-  },
-  "ig-square": {
-   "src": "/library/il-flow-beach-square.jpg",
-   "can": {
-    "x": 47.9,
-    "y": 65.7,
-    "scale": 0.422
-   },
-   "fg": null,
-   "header_y": 9,
-   "sub_y": 94
-  }
- },
- "copy": {
-  "story": "Post-surf walk-up, tilted parasol, striped sea. Salty, sunny, still moving.",
-  "headers": [
-   "Surf's Up, Mood's Up",
-   "Heat Wave Season",
-   "Catch The Next One"
-  ],
-  "sub": "Roselle & Pomegranate",
-  "format": "carousel slot 3"
  }
 },
 {

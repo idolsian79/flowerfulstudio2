@@ -11,10 +11,11 @@ import { makeZip } from "@/lib/zip";
 import { StickerColour, StickerGroup, badgeFont, badgeTracking, propPalette, badgeTextColour, botanicalsFor, mix, paletteFor, stickerById, stickerSvg, stickers, svgUrl } from "@/lib/stickers";
 import { PropArr, SetSettings, SetShape, defaultSet, drawSet, drawWorld, propArrangements, propSpots, setGeometry, setPalettes, setShapes } from "@/lib/set";
 
+const FLAVOUR_ORDER = ["flow", "flourish", "focus", "float", "lineup"];
 const products = {
+  flow: { name: "FLOW", flavour: "Roselle + Pomegranate", color: "#E6005C", radial: "/assets/radial-flow.jpg", soon: true },
   flourish: { name: "FLOURISH", flavour: "Butterfly Pea + Raspberry", color: "#0066FF", radial: "/assets/radial-flourish.jpg", soon: false },
   focus: { name: "FOCUS", flavour: "Saffron + Cardamom", color: "#FF6A00", radial: "/assets/radial-focus.jpg", soon: false },
-  flow: { name: "FLOW", flavour: "Roselle + Pomegranate", color: "#E6005C", radial: "/assets/radial-flow.jpg", soon: true },
   float: { name: "FLOAT", flavour: "Chrysanthemum + Honey", color: "#FFC400", radial: "/assets/radial-float.jpg", soon: true },
   lineup: { name: "LINE-UP", flavour: "FLOW · FLOURISH · FOCUS · FLOAT", color: "#333333", radial: "", soon: false },
 } as const;
@@ -1033,7 +1034,7 @@ export default function Home() {
     setBusy(true);
     try {
       await fontsReady();
-      const list: ProductKey[] = seriesSoon ? ["flourish", "focus", "flow", "float"] : ["flourish", "focus"], files = [];
+      const list: ProductKey[] = seriesSoon ? ["flow", "flourish", "focus", "float"] : ["flourish", "focus"], files = [];
       for (const pk of list) {
         const d2 = seriesDoc(doc, pk);
         files.push({ name: `flowerful-series-${String(files.length + 1).padStart(2, "0")}-${pk}-${out.w}x${out.h}.${doc.format}`, blob: await toBlob(await renderToCanvas(d2, out.w, out.h), doc.format) });
@@ -1051,7 +1052,7 @@ export default function Home() {
     const id = setTimeout(async () => {
       await fontsReady();
       const W = 150, H = Math.round((150 * out.h) / out.w), urls: string[] = [];
-      for (const pk of (seriesSoon ? ["flourish", "focus", "flow", "float"] : ["flourish", "focus"]) as ProductKey[]) urls.push((await renderToCanvas({ ...seriesDoc(doc, pk), format: "jpg" }, W, H)).toDataURL("image/jpeg", 0.8));
+      for (const pk of (seriesSoon ? ["flow", "flourish", "focus", "float"] : ["flourish", "focus"]) as ProductKey[]) urls.push((await renderToCanvas({ ...seriesDoc(doc, pk), format: "jpg" }, W, H)).toDataURL("image/jpeg", 0.8));
       if (!dead) setSeriesThumbs(urls);
     }, 400);
     return () => { dead = true; clearTimeout(id); };
@@ -1318,7 +1319,7 @@ export default function Home() {
                   <>
                     <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Cover scenes also add the approved Flowerful lockup as the masthead, plus an editable cover line.</p>
                     {["Illustrated", "Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
-                      const list = scenes.filter((x) => x.group === g).sort((a, b) => (Number(!!b.hero) - Number(!!a.hero)) || ((a.flavour === doc.product ? -1 : 0) - (b.flavour === doc.product ? -1 : 0)));
+                      const list = scenes.filter((x) => x.group === g).sort((a, b) => (Number(!!b.hero) - Number(!!a.hero)) || (FLAVOUR_ORDER.indexOf(a.flavour) - FLAVOUR_ORDER.indexOf(b.flavour)));
                       if (!list.length) return null;
                       return (
                         <div key={g}>
@@ -1665,7 +1666,7 @@ function WizardModal({ wiz, setWiz, onFinish }: { wiz: Wizard; setWiz: (w: Wizar
         <div className="wiz-body">
           {wiz.step === 0 && (<>
             <div className="gl">Which can?</div>
-            <div className="seg">{(["flourish", "focus", "flow", "float"] as ProductKey[]).map((k) => <button key={k} className={wiz.product === k ? "on" : ""} onClick={() => up({ product: k, line: headerLines[groupForProduct(k)][0], style: wiz.style === "reveal" && k !== "flourish" ? "plinth" : wiz.style })}>{products[k].name}{products[k].soon ? " (soon)" : ""}</button>)}</div>
+            <div className="seg">{(["flow", "flourish", "focus", "float"] as ProductKey[]).map((k) => <button key={k} className={wiz.product === k ? "on" : ""} onClick={() => up({ product: k, line: headerLines[groupForProduct(k)][0], style: wiz.style === "reveal" && k !== "flourish" ? "plinth" : wiz.style })}>{products[k].name}{products[k].soon ? " (soon)" : ""}</button>)}</div>
             <div className="gl">What is the post for?</div>
             <div className="choice">{goals.map(([k, l, h]) => <button key={k} className={wiz.goal === k ? "on" : ""} onClick={() => up({ goal: k, format: k === "story" ? "carousel" : wiz.format })}><b>{l}</b><small>{h}</small></button>)}</div>
           </>)}
