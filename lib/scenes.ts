@@ -1,6 +1,6 @@
 // Built-in background library. Plates contain NO can; the approved can is placed as its own layer.
 // fg: optional transparent PNG drawn just above the can (flowers that wrap in front).
-export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number; masthead?: { text: string; line: string; header_y: number; sub_y: number } };
+export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number; masthead?: { logo: "lockup"; colour: "white" | "ink"; line: string; lockup_y: number; lockup_scale: number; sub_y: number } };
 export const scenes: Scene[] = [
  {
   "id": "flourish-collar",
@@ -322,30 +322,34 @@ export const scenes: Scene[] = [
   "light": "left",
   "kb": 278,
   "masthead": {
-   "text": "FLOWERFUL",
+   "logo": "lockup",
+   "colour": "white",
    "line": "The Bloom Issue",
-   "header_y": 8.5,
-   "sub_y": 14.5
+   "lockup_y": 6.3,
+   "lockup_scale": 0.75,
+   "sub_y": 12.6
   }
  },
  {
-  "id": "flourish-balloon",
+  "id": "float-balloon",
   "group": "Cover",
-  "flavour": "flourish",
-  "src": "/library/flourish-balloon.jpg",
-  "fg": null,
+  "flavour": "float",
+  "src": "/library/float-balloon.jpg",
+  "fg": "/library/float-balloon-fg.png",
   "can": {
-   "x": 46.8,
-   "y": 72.8,
-   "scale": 0.31
+   "x": 53.5,
+   "y": 85.6,
+   "scale": 0.316
   },
   "light": "left",
-  "kb": 313,
+  "kb": 220,
   "masthead": {
-   "text": "FLOWERFUL",
+   "logo": "lockup",
+   "colour": "ink",
    "line": "Sky High",
-   "header_y": 8.5,
-   "sub_y": 14.5
+   "lockup_y": 6.3,
+   "lockup_scale": 0.75,
+   "sub_y": 12.6
   }
  },
  {
@@ -362,10 +366,12 @@ export const scenes: Scene[] = [
   "light": "left",
   "kb": 192,
   "masthead": {
-   "text": "FLOWERFUL",
+   "logo": "lockup",
+   "colour": "ink",
    "line": "Soft Landing",
-   "header_y": 8.5,
-   "sub_y": 14.5
+   "lockup_y": 6.3,
+   "lockup_scale": 0.75,
+   "sub_y": 12.6
   }
  },
  {
@@ -382,10 +388,12 @@ export const scenes: Scene[] = [
   "light": "left",
   "kb": 269,
   "masthead": {
-   "text": "FLOWERFUL",
+   "logo": "lockup",
+   "colour": "white",
    "line": "Lock In",
-   "header_y": 8.5,
-   "sub_y": 14.5
+   "lockup_y": 6.3,
+   "lockup_scale": 0.75,
+   "sub_y": 12.6
   }
  },
  {
@@ -402,10 +410,12 @@ export const scenes: Scene[] = [
   "light": "left",
   "kb": 301,
   "masthead": {
-   "text": "FLOWERFUL",
+   "logo": "lockup",
+   "colour": "ink",
    "line": "Heat Wave",
-   "header_y": 8.5,
-   "sub_y": 14.5
+   "lockup_y": 6.3,
+   "lockup_scale": 0.75,
+   "sub_y": 12.6
   }
  },
  {
@@ -422,10 +432,12 @@ export const scenes: Scene[] = [
   "light": "left",
   "kb": 353,
   "masthead": {
-   "text": "FLOWERFUL",
+   "logo": "lockup",
+   "colour": "ink",
    "line": "Quiet Glow",
-   "header_y": 8.5,
-   "sub_y": 14.5
+   "lockup_y": 6.3,
+   "lockup_scale": 0.75,
+   "sub_y": 12.6
   }
  }
 ];

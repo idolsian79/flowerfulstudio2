@@ -1307,7 +1307,7 @@ export default function Home() {
                 )}
                 {bgMode === "library" && (
                   <>
-                    <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Cover scenes also set an editable FLOWERFUL masthead and cover line.</p>
+                    <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Cover scenes also add the approved Flowerful lockup as the masthead, plus an editable cover line.</p>
                     {["Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
                       const list = scenes.filter((x) => x.group === g).sort((a, b) => (a.flavour === doc.product ? -1 : 0) - (b.flavour === doc.product ? -1 : 0));
                       if (!list.length) return null;
@@ -1328,30 +1328,32 @@ export default function Home() {
                                       aligned: null,
                                       product: sc.flavour,
                                       set: { ...d.set, on: false },
-                                      header: mh ? { ...d.header, text: mh.text, caps: true, align: "center" as Align } : d.header,
+                                      markColour: mh ? mh.colour : d.markColour,
+                                      lockup: mh ? { ...d.lockup, layout: "left" as const } : d.lockup,
                                       sub: mh ? { ...d.sub, text: mh.line, custom: true, caps: true, align: "center" as Align } : (d.sub.custom ? d.sub : { ...d.sub, text: flavourText(sc.flavour) }),
                                       layers: {
                                         ...d.layers,
                                         background: true,
                                         product: true,
-                                        header: mh ? true : d.layers.header,
+                                        header: mh ? false : d.layers.header,
                                         sub: mh ? true : d.layers.sub,
-                                        // Cover masthead replaces the wordmark so we do not double-brand
+                                        // Cover masthead is the approved icon + wordmark lockup (movable layer)
                                         wordmark: mh ? false : d.layers.wordmark,
-                                        lockup: mh ? false : d.layers.lockup,
+                                        icon: mh ? false : d.layers.icon,
+                                        lockup: mh ? true : d.layers.lockup,
                                       },
                                       t: {
                                         ...d.t,
                                         ...(sc.can ? { product: { ...d.t.product, ...sc.can } } : {}),
                                         ...(mh ? {
-                                          header: { ...d.t.header, x: 50, y: mh.header_y, scale: 1.05 },
+                                          lockup: { ...d.t.lockup, x: 50, y: mh.lockup_y, scale: mh.lockup_scale },
                                           sub: { ...d.t.sub, x: 50, y: mh.sub_y, scale: 0.95 },
                                         } : {}),
                                       },
                                     };
                                   });
                                   setCopyTab(groupForProduct(sc.flavour));
-                                  setNotice(sc.masthead ? "Cover set. Real can and editable FLOWERFUL masthead are separate layers." : "Scene set. The can is the real approved artwork and stays movable.");
+                                  setNotice(sc.masthead ? "Cover set. Real can, approved Flowerful lockup and cover line are separate layers." : "Scene set. The can is the real approved artwork and stays movable.");
                                 }} />
                             ))}
                           </div>
