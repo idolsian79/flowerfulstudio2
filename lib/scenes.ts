@@ -1,6 +1,6 @@
 // Built-in background library. Plates contain NO can; the approved can is placed as its own layer.
 // fg: optional transparent PNG drawn just above the can (flowers that wrap in front).
-export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number };
+export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number; masthead?: { text: string; line: string; header_y: number; sub_y: number } };
 export const scenes: Scene[] = [
  {
   "id": "flourish-collar",
@@ -307,5 +307,125 @@ export const scenes: Scene[] = [
   },
   "light": "left",
   "kb": 371
+ },
+ {
+  "id": "flourish-bloomhead",
+  "group": "Cover",
+  "flavour": "flourish",
+  "src": "/library/flourish-bloomhead.jpg",
+  "fg": null,
+  "can": {
+   "x": 46.3,
+   "y": 57.0,
+   "scale": 0.381
+  },
+  "light": "left",
+  "kb": 278,
+  "masthead": {
+   "text": "FLOWERFUL",
+   "line": "The Bloom Issue",
+   "header_y": 8.5,
+   "sub_y": 14.5
+  }
+ },
+ {
+  "id": "flourish-balloon",
+  "group": "Cover",
+  "flavour": "flourish",
+  "src": "/library/flourish-balloon.jpg",
+  "fg": null,
+  "can": {
+   "x": 46.8,
+   "y": 72.8,
+   "scale": 0.31
+  },
+  "light": "left",
+  "kb": 313,
+  "masthead": {
+   "text": "FLOWERFUL",
+   "line": "Sky High",
+   "header_y": 8.5,
+   "sub_y": 14.5
+  }
+ },
+ {
+  "id": "focus-shell",
+  "group": "Cover",
+  "flavour": "focus",
+  "src": "/library/focus-shell.jpg",
+  "fg": null,
+  "can": {
+   "x": 49.5,
+   "y": 70.2,
+   "scale": 0.321
+  },
+  "light": "left",
+  "kb": 192,
+  "masthead": {
+   "text": "FLOWERFUL",
+   "line": "Soft Landing",
+   "header_y": 8.5,
+   "sub_y": 14.5
+  }
+ },
+ {
+  "id": "focus-rays",
+  "group": "Cover",
+  "flavour": "focus",
+  "src": "/library/focus-rays.jpg",
+  "fg": null,
+  "can": {
+   "x": 50.0,
+   "y": 60.0,
+   "scale": 0.425
+  },
+  "light": "left",
+  "kb": 269,
+  "masthead": {
+   "text": "FLOWERFUL",
+   "line": "Lock In",
+   "header_y": 8.5,
+   "sub_y": 14.5
+  }
+ },
+ {
+  "id": "flow-parasol",
+  "group": "Cover",
+  "flavour": "flow",
+  "src": "/library/flow-parasol.jpg",
+  "fg": null,
+  "can": {
+   "x": 65.3,
+   "y": 80.7,
+   "scale": 0.316
+  },
+  "light": "left",
+  "kb": 301,
+  "masthead": {
+   "text": "FLOWERFUL",
+   "line": "Heat Wave",
+   "header_y": 8.5,
+   "sub_y": 14.5
+  }
+ },
+ {
+  "id": "float-butterfly",
+  "group": "Cover",
+  "flavour": "float",
+  "src": "/library/float-butterfly.jpg",
+  "fg": null,
+  "can": {
+   "x": 46.3,
+   "y": 63.0,
+   "scale": 0.349
+  },
+  "light": "left",
+  "kb": 353,
+  "masthead": {
+   "text": "FLOWERFUL",
+   "line": "Quiet Glow",
+   "header_y": 8.5,
+   "sub_y": 14.5
+  }
  }
 ];
