@@ -8,7 +8,7 @@ import {
 import { BgSettings, GradientType, LightDir, bgPresets, defaultPresetFor, drawBackground, drawCanShadow } from "@/lib/background";
 import { CopyGroup, Slide, copyGroups, groupForProduct, headerLines, originalCount, storyTemplates, subLines } from "@/lib/copy";
 import { makeZip } from "@/lib/zip";
-import { StickerColour, StickerGroup, badgeFont, badgeTracking, propPalette, badgeTextColour, botanicalsFor, mix, paletteFor, stickerById, stickerSvg, stickers, svgUrl } from "@/lib/stickers";
+import { StickerColour, StickerGroup, badgeFont, badgeTracking, propPalette, badgeTextColour, botanicalsFor, petalsFor, mix, paletteFor, stickerById, stickerSvg, stickers, svgUrl } from "@/lib/stickers";
 import { PropArr, SetSettings, SetShape, defaultSet, drawSet, drawWorld, propArrangements, propSpots, setGeometry, setPalettes, setShapes } from "@/lib/set";
 
 const FLAVOUR_ORDER = ["flow", "flourish", "focus", "float", "lineup"];
@@ -302,7 +302,7 @@ function shuffleDoc(d: Doc, locks: Locks): { doc: Doc; layout: LayoutKind } {
     n = fitCan({ ...n, header: { ...n.header, size: fitSize(n.header.text, mx, wp) } });
   }
   if (!locks.stickers) {
-    const pool = ["petal", "petals", "leaf", "sparkle", "sparkles", "badge-ribbon", "badge-tag", n.product === "flow" || n.product === "float" ? "badge-round" : "badge-pill"];
+    const pool = [...petalsFor(n.product), "leaf", "sparkle", "sparkles", "badge-ribbon", "badge-tag", n.product === "flow" || n.product === "float" ? "badge-round" : "badge-pill"];
     const count = 1 + Math.floor(r() * 3), spots = [...stickerSpots[layout]].sort(() => r() - 0.5), chosen: StickerLayer[] = [];
     const used = new Set<string>();
     for (let i = 0; i < count; i++) {
@@ -332,7 +332,7 @@ function seriesDoc(d: Doc, to: ProductKey): Doc {
     ...(d.bgSource === "create" && tb.length ? { bg: tb[Math.max(0, pi) % tb.length].s, bgPreset: tb[Math.max(0, pi) % tb.length].id } : {}),
     header: { ...d.header, text: hi >= 0 && g0 !== g1 ? headerLines[g1][hi % headerLines[g1].length] : d.header.text },
     sub: { ...d.sub, text: d.sub.text.toLowerCase() === flavourText(d.product).toLowerCase() || !d.sub.custom ? flavourText(to) : d.sub.text },
-    stickers: d.stickers.map((st) => ({ ...st, kind: bf.includes(st.kind) ? bt[bf.indexOf(st.kind)] : st.kind, text: st.kind === "badge-tag" ? products[to].name : st.text })),
+    stickers: d.stickers.map((st) => ({ ...st, kind: petalsFor(d.product).includes(st.kind) ? petalsFor(to)[petalsFor(d.product).indexOf(st.kind)] : bf.includes(st.kind) ? bt[bf.indexOf(st.kind) % bt.length] : st.kind, text: st.kind === "badge-tag" ? products[to].name : st.text })),
   };
 }
 // brand safety check (en-GB house rules, UAE GSO 2333 claim caution)
@@ -400,7 +400,7 @@ function composeGuided(base: Doc, w: Wizard): Doc {
   if (w.style === "pattern") st.push(makeSticker(botanicalsFor(w.product)[0], 50, 50, w.product, { repeat: "scatter", opacity: 0.22, colour: "white", scale: 0.55 }));
   if (w.goal === "launch") st.push(makeSticker(w.product === "flow" || w.product === "float" ? "badge-round" : "badge-pill", 84, a0 + 46 * k, w.product, { rot: 10 }));
   if (w.stickers) {
-    st.push(makeSticker("petals", 16, a0 + 50 * k, w.product, { rot: -14, scale: 0.55 }));
+    st.push(makeSticker(petalsFor(w.product)[1], 16, a0 + 50 * k, w.product, { rot: -14, scale: 0.55 }));
     if (w.goal !== "launch") st.push(makeSticker("sparkles", 85, a0 + 44 * k, w.product, { scale: 0.42 }));
   }
   if (w.goal === "story") st.push(makeSticker("badge-swipe", 82, a0 + 90 * k, w.product, { scale: 0.7 }));
@@ -611,7 +611,7 @@ export default function Home() {
           c.save(); c.globalAlpha = 0.35; c.fillStyle = mix(set.wall, -0.55);
           c.beginPath(); c.ellipse(sp.x + dir * pw * 0.35, sp.y, pw * 0.62, pw * 0.1, 0, 0, TAU); c.fill(); c.restore();
           // loose ingredients lie on the surface; upright ones (flowers, berries, buds) stand on their base
-          const lie = ({ "saffron-thread": 84, "cardamom-pod": 72, petal: 76, leaf: 50, petals: 0 } as Record<string, number>)[def.id];
+          const lie = ({ "saffron-thread": 84, "cardamom-pod": 72, petal: 76, "petal-roselle": 76, "petal-chrys": 76, "petal-saffron": 76, leaf: 50, petals: 0 } as Record<string, number>)[def.id];
           c.save();
           if (lie) { c.translate(sp.x, sp.y - pw * 0.13); c.rotate(((sp.i % 2 ? -1 : 1) * lie + sp.r * 0.3) * Math.PI / 180); c.drawImage(img, -pw / 2, -ph / 2, pw, ph); }
           else { c.translate(sp.x, sp.y); c.rotate((sp.r * Math.PI) / 180 * 0.4); c.drawImage(img, -pw / 2, -ph * 0.94, pw, ph); }
