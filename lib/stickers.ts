@@ -94,6 +94,11 @@ const art: Record<string, (p: Pal) => string> = {
   petals: (p) => S(p, `<g transform="rotate(-28 30 40)">${B(p, "M28 62 C16 52 15 34 24 21 C28 15 32 12 35 11 C42 22 44 38 38 52 C35 57 32 60 28 62Z", 0.9)}${fine("M28 60 C28 46 30 30 34 13", 0.5, 0.6)}</g>
     <g transform="rotate(22 70 30)">${B(p, "M70 52 C60 44 58 28 64 17 C67 12 70 9 73 8 C79 17 81 31 77 43 C75 47 73 50 70 52Z", 0.7)}${fine("M70 50 C70 38 71 24 73 10", 0.5, 0.6)}</g>
     <g transform="rotate(6 52 74)">${B(p, "M51 96 C40 88 38 72 44 60 C47 55 50 52 53 51 C60 60 62 74 58 86 C56 91 54 94 51 96Z", 1.1)}${fine("M51 94 C51 80 52 66 53 53", 0.5, 0.6)}</g>`),
+  // pomegranate aril: small faceted jewel-like seed with a pale core and a fine highlight
+  aril: (p) => S(p, `${B(p, "M50 12 C62 24 74 40 74 58 C74 76 63 90 50 90 C37 90 26 76 26 58 C26 40 38 24 50 12Z")}${H("M50 12 C62 24 74 40 74 58 C74 76 63 90 50 90 C37 90 26 76 26 58 C26 40 38 24 50 12Z", 56, 2.2)}
+    ${fine("M50 16 L42 46 L50 86 M50 16 L60 48 L50 86 M30 60 L42 46 L60 48 L70 62", 0.4, 0.55)}
+    <path d="M48 52 C46 58 47 66 50 70 C53 66 54 58 52 52 C51 50 49 50 48 52Z" fill="${p.accent}" fill-opacity=".55" stroke-width=".5"/>
+    <path d="M36 40 C38 33 42 27 46 23" stroke="${p.accent}" stroke-width="1.4" opacity=".8"/>`),
   // shapes: hairline glints, fine effervescence, grain, rules, arches, frames
   sparkle: (p) => S(p, `<path d="M50 8 C51 38 52.5 47.5 92 50 C52.5 52.5 51 62 50 92 C49 62 47.5 52.5 8 50 C47.5 47.5 49 38 50 8Z" fill="${p.fill}" fill-opacity="${(p.tone ?? 0.22) * 0.6}"/><circle cx="50" cy="50" r=".9" fill="${p.line}" stroke="none"/>`),
   sparkles: (p) => S(p, `<path d="M38 16 C38.8 40 40 45 62 46 C40 47 38.8 52 38 76 C37.2 52 36 47 14 46 C36 45 37.2 40 38 16Z"/>
@@ -131,6 +136,7 @@ const art: Record<string, (p: Pal) => string> = {
 };
 
 const nat = {
+  pom: { line: "#4A0414", fill: "#B3122F", accent: "#F7D9DF", tone: 0.26 },
   pea: { line: "#1A2160", fill: "#2E4BFF", accent: "#F2EBD2", tone: 0.2 },
   rasp: { line: "#5C1027", fill: "#C42552", accent: "#5E7F3E", tone: 0.2 },
   saff: { line: "#7A1A05", fill: "#C8320E", accent: "#E9C77E", tone: 0.26 },
@@ -150,8 +156,14 @@ export const stickers: StickerDef[] = [
   { id: "roselle-bud", name: "Roselle calyx", group: "Botanicals", natural: nat.ros, flavours: ["flow"] },
   { id: "chrysanthemum", name: "Chrysanthemum", group: "Botanicals", natural: nat.chry, flavours: ["float"] },
   { id: "leaf", name: "Leaf", group: "Botanicals", natural: nat.leaf },
-  { id: "petal", name: "Petal", group: "Botanicals", natural: nat.pea },
-  { id: "petals", name: "Fallen petals", group: "Botanicals", natural: nat.pea },
+  { id: "petal", name: "Butterfly pea petal", group: "Botanicals", natural: nat.pea, flavours: ["flourish"] },
+  { id: "petals", name: "Butterfly pea petals", group: "Botanicals", natural: nat.pea, flavours: ["flourish"] },
+  { id: "petal-roselle", name: "Roselle petal", group: "Botanicals", natural: nat.ros, flavours: ["flow"] },
+  { id: "petals-roselle", name: "Roselle petals", group: "Botanicals", natural: nat.ros, flavours: ["flow"] },
+  { id: "aril", name: "Pomegranate aril", group: "Botanicals", natural: nat.pom, flavours: ["flow"] },
+  { id: "petal-chrys", name: "Chrysanthemum petal", group: "Botanicals", natural: nat.chry, flavours: ["float"] },
+  { id: "petals-chrys", name: "Chrysanthemum petals", group: "Botanicals", natural: nat.chry, flavours: ["float"] },
+  { id: "petal-saffron", name: "Crocus petal", group: "Botanicals", natural: { line: "#3E1F5C", fill: "#8E5BC9", accent: "#F2E6FF", tone: 0.2 }, flavours: ["focus"] },
   { id: "badge-pill", name: "New", group: "Badges", natural: nat.badge, aspect: 160 / 60, text: "NEW", textArea: { x: 0.5, y: 0.52, w: 0.62, size: 0.26 } },
   { id: "badge-round", name: "Coming soon seal", group: "Badges", natural: nat.badge, text: "COMING\nSOON", textArea: { x: 0.5, y: 0.5, w: 0.56, size: 0.1 } },
   { id: "badge-sugar", name: "Sugar seal", group: "Badges", natural: nat.badge, text: "4%\nSUGAR", textArea: { x: 0.5, y: 0.5, w: 0.5, size: 0.12 } },
@@ -173,7 +185,11 @@ export const stickers: StickerDef[] = [
   { id: "towel", name: "Towel", group: "Lifestyle", natural: nat.ink },
 ];
 export const stickerById = (id: string) => stickers.find((s) => s.id === id)!;
-export const botanicalsFor = (product: string) => (({ flourish: ["butterfly-pea", "raspberry"], focus: ["saffron-thread", "cardamom-pod"], flow: ["roselle-bud", "petal"], float: ["chrysanthemum", "petal"], lineup: ["petal", "leaf"] }) as Record<string, string[]>)[product] ?? ["petal"];
+// each flavour only ever gets props from its own ingredients
+export const botanicalsFor = (product: string) => (({ flourish: ["butterfly-pea", "raspberry", "petal"], focus: ["saffron-thread", "cardamom-pod"], flow: ["roselle-bud", "petal-roselle", "aril"], float: ["chrysanthemum", "petal-chrys"], lineup: ["leaf"] }) as Record<string, string[]>)[product] ?? ["leaf"];
+// loose petal stickers in the flavour's own flower
+export const petalsFor = (product: string) => (({ flourish: ["petal", "petals"], flow: ["petal-roselle", "petals-roselle"], float: ["petal-chrys", "petals-chrys"], focus: ["saffron-thread", "cardamom-pod"], lineup: ["leaf", "leaf"] }) as Record<string, string[]>)[product] ?? ["leaf", "leaf"];
+art["petal-roselle"] = art.petal; art["petals-roselle"] = art.petals; art["petal-chrys"] = art.petal; art["petals-chrys"] = art.petals; art["petal-saffron"] = art.petal;
 
 function mix(hex: string, amt: number) {
   const n = parseInt(hex.replace("#", "").slice(0, 6), 16);
