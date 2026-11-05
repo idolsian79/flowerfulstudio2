@@ -1308,7 +1308,7 @@ export default function Home() {
                 {bgMode === "library" && (
                   <>
                     <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Cover scenes also add the approved Flowerful lockup as the masthead, plus an editable cover line.</p>
-                    {["Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
+                    {["Illustrated", "Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
                       const list = scenes.filter((x) => x.group === g).sort((a, b) => (a.flavour === doc.product ? -1 : 0) - (b.flavour === doc.product ? -1 : 0));
                       if (!list.length) return null;
                       return (
@@ -1319,7 +1319,7 @@ export default function Home() {
                               <button key={sc.id} title={sc.id} className={doc.image === sc.src ? "on" : ""} style={{ padding: 0, aspectRatio: "4 / 5", borderRadius: 8, overflow: "hidden", background: `center/cover url(${sc.src})`, outline: doc.image === sc.src ? "2px solid #0066FF" : "none" }}
                                 onClick={() => {
                                   commit((d) => {
-                                    const mh = sc.masthead;
+                                    const mh = sc.masthead; const cp = sc.copy;
                                     return {
                                       ...d,
                                       image: sc.src,
@@ -1330,17 +1330,18 @@ export default function Home() {
                                       set: { ...d.set, on: false },
                                       markColour: mh ? mh.colour : d.markColour,
                                       lockup: mh ? { ...d.lockup, layout: "left" as const } : d.lockup,
-                                      sub: mh ? { ...d.sub, text: mh.line, custom: true, caps: true, align: "center" as Align } : (d.sub.custom ? d.sub : { ...d.sub, text: flavourText(sc.flavour) }),
+                                      header: cp ? { ...d.header, text: cp.headers[0], caps: true, align: "center" as Align } : d.header,
+                                      sub: cp ? { ...d.sub, text: cp.sub, custom: true, caps: true, align: "center" as Align } : mh ? { ...d.sub, text: mh.line, custom: true, caps: true, align: "center" as Align } : (d.sub.custom ? d.sub : { ...d.sub, text: flavourText(sc.flavour) }),
                                       layers: {
                                         ...d.layers,
                                         background: true,
                                         product: true,
-                                        header: mh ? false : d.layers.header,
-                                        sub: mh ? true : d.layers.sub,
+                                        header: cp ? true : mh ? false : d.layers.header,
+                                        sub: cp || mh ? true : d.layers.sub,
                                         // Cover masthead is the approved icon + wordmark lockup (movable layer)
-                                        wordmark: mh ? false : d.layers.wordmark,
-                                        icon: mh ? false : d.layers.icon,
-                                        lockup: mh ? true : d.layers.lockup,
+                                        wordmark: cp || mh ? false : d.layers.wordmark,
+                                        icon: cp || mh ? false : d.layers.icon,
+                                        lockup: cp ? false : mh ? true : d.layers.lockup,
                                       },
                                       t: {
                                         ...d.t,
@@ -1349,11 +1350,12 @@ export default function Home() {
                                           lockup: { ...d.t.lockup, x: 50, y: mh.lockup_y, scale: mh.lockup_scale },
                                           sub: { ...d.t.sub, x: 50, y: mh.sub_y, scale: 0.95 },
                                         } : {}),
+                                        ...(cp ? { header: { ...d.t.header, x: 50, y: 12 }, sub: { ...d.t.sub, x: 50, y: 92 } } : {}),
                                       },
                                     };
                                   });
                                   setCopyTab(groupForProduct(sc.flavour));
-                                  setNotice(sc.masthead ? "Cover set. Real can, approved Flowerful lockup and cover line are separate layers." : "Scene set. The can is the real approved artwork and stays movable.");
+                                  setNotice(sc.copy ? `Illustrated scene: ${sc.copy.story} Header and sub line are pre-filled and editable. Other headers: ${sc.copy.headers.slice(1).join(" / ")}. Best as: ${sc.copy.format}.` : sc.masthead ? "Cover set. Real can, approved Flowerful lockup and cover line are separate layers." : "Scene set. The can is the real approved artwork and stays movable.");
                                 }} />
                             ))}
                           </div>

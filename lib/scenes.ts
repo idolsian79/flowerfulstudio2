@@ -1,6 +1,6 @@
 // Built-in background library. Plates contain NO can; the approved can is placed as its own layer.
 // fg: optional transparent PNG drawn just above the can (flowers that wrap in front).
-export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number; masthead?: { logo: "lockup"; colour: "white" | "ink"; line: string; lockup_y: number; lockup_scale: number; sub_y: number } };
+export type Scene = { id: string; group: string; flavour: "flourish" | "focus" | "flow" | "float" | "lineup"; src: string; fg: string | null; can: { x: number; y: number; scale: number } | null; light: "left"; kb: number; copy?: { story: string; headers: string[]; sub: string; format: string }; masthead?: { logo: "lockup"; colour: "white" | "ink"; line: string; lockup_y: number; lockup_scale: number; sub_y: number } };
 export const scenes: Scene[] = [
  {
   "id": "flourish-collar",
@@ -439,5 +439,293 @@ export const scenes: Scene[] = [
    "lockup_scale": 0.75,
    "sub_y": 12.6
   }
+ },
+{
+ "id": "il-flourish-run",
+ "group": "Illustrated",
+ "flavour": "flourish",
+ "src": "/library/il-flourish-run.jpg",
+ "fg": null,
+ "can": {
+  "x": 53.7,
+  "y": 71.3,
+  "scale": 0.441
+ },
+ "light": "left",
+ "kb": 291,
+ "copy": {
+  "story": "Sunrise run, head in full bloom, butterflies chasing the pace. First light, first win.",
+  "headers": [
+   "Bloom Before Breakfast",
+   "Run It Blue",
+   "Main Character Mile"
+  ],
+  "sub": "Butterfly Pea & Raspberry",
+  "format": "post"
  }
+},
+{
+ "id": "il-flourish-pilates",
+ "group": "Illustrated",
+ "flavour": "flourish",
+ "src": "/library/il-flourish-pilates.jpg",
+ "fg": null,
+ "can": {
+  "x": 42.3,
+  "y": 51.5,
+  "scale": 0.397
+ },
+ "light": "left",
+ "kb": 263,
+ "copy": {
+  "story": "Pilates side bend, a bloom for a head and a shadow made of butterflies. Soft strength, big joy.",
+  "headers": [
+   "Stretch Into Bloom",
+   "Core Memory Unlocked",
+   "Soft Strong Blue"
+  ],
+  "sub": "Butterfly Pea & Raspberry",
+  "format": "carousel slot 1"
+ }
+},
+{
+ "id": "il-flourish-swim",
+ "group": "Illustrated",
+ "flavour": "flourish",
+ "src": "/library/il-flourish-swim.jpg",
+ "fg": null,
+ "can": {
+  "x": 49.9,
+  "y": 68.5,
+  "scale": 0.397
+ },
+ "light": "left",
+ "kb": 264,
+ "copy": {
+  "story": "Lido morning from above, floral swim cap, lane ropes in raspberry. The can waits poolside.",
+  "headers": [
+   "Lap It Up",
+   "Blue Hour, Every Hour",
+   "Dive Into Blue"
+  ],
+  "sub": "Butterfly Pea & Raspberry",
+  "format": "story"
+ }
+},
+{
+ "id": "il-focus-cycle",
+ "group": "Illustrated",
+ "flavour": "focus",
+ "src": "/library/il-focus-cycle.jpg",
+ "fg": null,
+ "can": {
+  "x": 62.2,
+  "y": 45.7,
+  "scale": 0.441
+ },
+ "light": "left",
+ "kb": 305,
+ "copy": {
+  "story": "Saffron sprint, crocus helmet, sunburst behind. Pure lock-in energy on two wheels.",
+  "headers": [
+   "Lock In, Ride Out",
+   "Full Send Saffron",
+   "Gears On, Phone Off"
+  ],
+  "sub": "Saffron & Cardamom",
+  "format": "post"
+ }
+},
+{
+ "id": "il-focus-study",
+ "group": "Illustrated",
+ "flavour": "focus",
+ "src": "/library/il-focus-study.jpg",
+ "fg": null,
+ "can": {
+  "x": 51.8,
+  "y": 75.3,
+  "scale": 0.353
+ },
+ "light": "left",
+ "kb": 247,
+ "copy": {
+  "story": "Deep work hour: crocus head, headphones on, cardamom bookmarks, light falling diagonally.",
+  "headers": [
+   "Deep Work Era",
+   "Do Not Disturb",
+   "Brain Fully Booted"
+  ],
+  "sub": "Saffron & Cardamom",
+  "format": "carousel slot 2"
+ }
+},
+{
+ "id": "il-focus-gym",
+ "group": "Illustrated",
+ "flavour": "focus",
+ "src": "/library/il-focus-gym.jpg",
+ "fg": null,
+ "can": {
+  "x": 50.3,
+  "y": 73.8,
+  "scale": 0.382
+ },
+ "light": "left",
+ "kb": 270,
+ "copy": {
+  "story": "Kettlebell session with flower-disc weight plates. The can takes the spare plate.",
+  "headers": [
+   "PR Season",
+   "Lift Loud",
+   "Built Different, Brewed Different"
+  ],
+  "sub": "Saffron & Cardamom",
+  "format": "post"
+ }
+},
+{
+ "id": "il-flow-rooftop",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-rooftop.jpg",
+ "fg": null,
+ "can": {
+  "x": 40.9,
+  "y": 60.0,
+  "scale": 0.397
+ },
+ "light": "left",
+ "kb": 215,
+ "copy": {
+  "story": "Golden hour wind-down, hibiscus in her hair, magenta terrace stripes. Warmth after the work.",
+  "headers": [
+   "Golden Hour Unlocked",
+   "Stay For The Sunset",
+   "Wind Down, Glow Up"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "post"
+ }
+},
+{
+ "id": "il-flow-festival",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-festival.jpg",
+ "fg": null,
+ "can": {
+  "x": 62.0,
+  "y": 65.3,
+  "scale": 0.412
+ },
+ "light": "left",
+ "kb": 277,
+ "copy": {
+  "story": "Mid-spin dancer, skirt of hibiscus petals, ribbons of motion. Festival energy in flow.",
+  "headers": [
+   "Move Like Nobody's Watching",
+   "Spin Cycle",
+   "Vibe In Motion"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "story"
+ }
+},
+{
+ "id": "il-flow-beach",
+ "group": "Illustrated",
+ "flavour": "flow",
+ "src": "/library/il-flow-beach.jpg",
+ "fg": null,
+ "can": {
+  "x": 47.9,
+  "y": 65.3,
+  "scale": 0.397
+ },
+ "light": "left",
+ "kb": 201,
+ "copy": {
+  "story": "Post-surf walk-up, tilted parasol, striped sea. Salty, sunny, still moving.",
+  "headers": [
+   "Surf's Up, Mood's Up",
+   "Heat Wave Season",
+   "Catch The Next One"
+  ],
+  "sub": "Roselle & Pomegranate",
+  "format": "carousel slot 3"
+ }
+},
+{
+ "id": "il-float-balloon",
+ "group": "Illustrated",
+ "flavour": "float",
+ "src": "/library/il-float-balloon.jpg",
+ "fg": null,
+ "can": {
+  "x": 52.0,
+  "y": 58.4,
+  "scale": 0.412
+ },
+ "light": "left",
+ "kb": 198,
+ "copy": {
+  "story": "Chrysanthemum hot-air balloon drifting over a cream cloud. The can lands on the cloud.",
+  "headers": [
+   "Sky High, Soft Landing",
+   "Lighter Than Air",
+   "Float Mode: On"
+  ],
+  "sub": "Chrysanthemum & Honey",
+  "format": "post"
+ }
+},
+{
+ "id": "il-float-yoga",
+ "group": "Illustrated",
+ "flavour": "float",
+ "src": "/library/il-float-yoga.jpg",
+ "fg": null,
+ "can": {
+  "x": 43.5,
+  "y": 66.9,
+  "scale": 0.397
+ },
+ "light": "left",
+ "kb": 207,
+ "copy": {
+  "story": "Tree pose under a chrysanthemum halo, a butterfly resting on her hair. Quiet, balanced.",
+  "headers": [
+   "Find Your Balance",
+   "Quiet Is A Flex",
+   "Breathe, Then Sip"
+  ],
+  "sub": "Chrysanthemum & Honey",
+  "format": "story"
+ }
+},
+{
+ "id": "il-float-moon",
+ "group": "Illustrated",
+ "flavour": "float",
+ "src": "/library/il-float-moon.jpg",
+ "fg": null,
+ "can": {
+  "x": 51.8,
+  "y": 54.7,
+  "scale": 0.412
+ },
+ "light": "left",
+ "kb": 274,
+ "copy": {
+  "story": "Hammock evening, the moon is a chrysanthemum, butterflies drift like stars.",
+  "headers": [
+   "Moon Mode",
+   "Do Nothing, Beautifully",
+   "Slow Night Club"
+  ],
+  "sub": "Chrysanthemum & Honey",
+  "format": "carousel slot 4"
+ }
+}
 ];
