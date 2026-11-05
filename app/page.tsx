@@ -192,7 +192,16 @@ function reflow(d: Doc, fromId: string, toId: string): Doc {
     if (t.product.y + half > bottom) t.product.y = bottom - half;
   }
   const stickers = d.stickers.map((st) => ({ ...st, y: Math.max(t0 + 3, Math.min(t1 - 3, t0 + ((st.y - f0) / (f1 - f0)) * (t1 - t0))), scale: st.scale * Math.pow((from.h / from.w) / (to.h / to.w), 0.3) }));
-  return { ...d, output: toId, t, stickers };
+  const r = { ...d, output: toId, t, stickers };
+  return applySceneFormat(r, toId);
+}
+// Illustrated scenes carry a plate, can position and text positions per format
+const fmtKey = (id: string) => (id === "reel" ? "ig-story" : id);
+function applySceneFormat(d: Doc, toId: string): Doc {
+  const sc = scenes.find((x) => x.formats && Object.values(x.formats).some((f) => f.src === d.image));
+  const f = sc?.formats?.[fmtKey(toId)];
+  if (!f) return d;
+  return { ...d, image: f.src, fg: f.fg ?? null, t: { ...d.t, product: { ...d.t.product, ...f.can }, header: { ...d.t.header, y: f.header_y }, sub: { ...d.t.sub, y: f.sub_y } } };
 }
 // ---------- v3 helpers ----------
 let uidN = 0;
@@ -1309,7 +1318,7 @@ export default function Home() {
                   <>
                     <p className="hint">Scene plates with no can. Your approved can stays its own layer, so you can move and resize it. Cover scenes also add the approved Flowerful lockup as the masthead, plus an editable cover line.</p>
                     {["Illustrated", "Cover", "Couture", "Gallery", "Vessel", "Plinth", "Cascade", "Arch"].map((g) => {
-                      const list = scenes.filter((x) => x.group === g).sort((a, b) => (a.flavour === doc.product ? -1 : 0) - (b.flavour === doc.product ? -1 : 0));
+                      const list = scenes.filter((x) => x.group === g).sort((a, b) => (Number(!!b.hero) - Number(!!a.hero)) || ((a.flavour === doc.product ? -1 : 0) - (b.flavour === doc.product ? -1 : 0)));
                       if (!list.length) return null;
                       return (
                         <div key={g}>
@@ -1320,7 +1329,7 @@ export default function Home() {
                                 onClick={() => {
                                   commit((d) => {
                                     const mh = sc.masthead; const cp = sc.copy;
-                                    return {
+                                    return applySceneFormat({
                                       ...d,
                                       image: sc.src,
                                       fg: sc.fg,
@@ -1350,9 +1359,9 @@ export default function Home() {
                                           lockup: { ...d.t.lockup, x: 50, y: mh.lockup_y, scale: mh.lockup_scale },
                                           sub: { ...d.t.sub, x: 50, y: mh.sub_y, scale: 0.95 },
                                         } : {}),
-                                        ...(cp ? { header: { ...d.t.header, x: 50, y: 12 }, sub: { ...d.t.sub, x: 50, y: 92 } } : {}),
+                                        ...(cp ? { header: { ...d.t.header, x: 50 }, sub: { ...d.t.sub, x: 50 } } : {}),
                                       },
-                                    };
+                                    }, d.output);
                                   });
                                   setCopyTab(groupForProduct(sc.flavour));
                                   setNotice(sc.copy ? `Illustrated scene: ${sc.copy.story} Header and sub line are pre-filled and editable. Other headers: ${sc.copy.headers.slice(1).join(" / ")}. Best as: ${sc.copy.format}.` : sc.masthead ? "Cover set. Real can, approved Flowerful lockup and cover line are separate layers." : "Scene set. The can is the real approved artwork and stays movable.");
