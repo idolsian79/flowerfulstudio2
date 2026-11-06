@@ -69,19 +69,52 @@ function lockupGeom(layout: "left" | "above", spacing: number, tag = false) {
   return { w: tw * k, h: (tag ? ty + tgh : ih + gap + wh) * k, icon: { x: ((tw - iw) / 2) * k, y: 0, w: iw * k, h: ih * k }, word: { x: ((tw - ww) / 2) * k, y: (ih + gap) * k, w: ww * k, h: wh * k }, tag: tag ? { x: ((tw - tgw) / 2) * k, y: ty * k, w: tgw * k, h: tgh * k } : null };
 }
 const iconW = 0.3, wordW = 0.44;
-// choosing a logo style also lays it out cleanly above the text (one undo step)
+type LogoKey = "icon" | "wordmark" | "lockup" | "tagline";
+const LOGO_KEYS: LogoKey[] = ["icon", "wordmark", "lockup", "tagline"];
+// lockup rule: icon width = 30% of wordmark width. Bases are iconW / wordW of the artboard, so iconScale = wordW * wordScale.
+const WORD_DEFAULT_SCALE = 0.55;
+const LOGO_DEFAULT_SCALE: Record<LogoKey, number> = {
+  wordmark: WORD_DEFAULT_SCALE,
+  icon: wordW * WORD_DEFAULT_SCALE, // ~0.242 → ~7.3% of artboard (= 30% of default wordmark)
+  lockup: 0.7,
+  tagline: (wordW * WORD_DEFAULT_SCALE * TAG_W) / tagW, // ~62% of default wordmark width
+};
+function logoBandBusy(d: Doc, y: number, except?: LogoKey, band = 14) {
+  return LOGO_KEYS.some((k) => k !== except && d.layers[k] && Math.abs(d.t[k].y - y) < band);
+}
+function placeLogo(d: Doc, k: LogoKey): T {
+  const scale = LOGO_DEFAULT_SCALE[k];
+  const topBusy = LOGO_KEYS.some((x) => x !== k && d.layers[x] && d.t[x].y < 40);
+  let candidates: number[];
+  if (k === "icon") candidates = topBusy ? [88, 8, 14, 80] : [8, 12, 88, 18];
+  else if (k === "wordmark") candidates = topBusy ? [90, 86, 8, 16] : [8, 90, 14, 86];
+  else if (k === "lockup") candidates = topBusy ? [88, 10, 16, 80] : [10, 88, 16];
+  else candidates = [92, 84, 22, 8];
+  for (const y of candidates) if (!logoBandBusy(d, y, k)) return { x: 50, y, scale };
+  return { x: 50, y: candidates[0], scale };
+}
+/** Turn a logo layer on without removing others; place it in a free spot at a lockup-rule size. */
+function addLogo(d: Doc, k: LogoKey): Doc {
+  if (d.layers[k]) return d;
+  return { ...d, layers: { ...d.layers, [k]: true }, t: { ...d.t, [k]: placeLogo(d, k) } };
+}
+function toggleLogo(d: Doc, k: LogoKey): Doc {
+  if (d.layers[k]) return { ...d, layers: { ...d.layers, [k]: false } };
+  return addLogo(d, k);
+}
+// wizard / one-shot presets only: exclusive logo style with text clearance
 function applyLogoStyle(d: Doc, k: "none" | "icon" | "wordmark" | "lockup" | "both"): Doc {
   const layers = { ...d.layers, lockup: k === "lockup", icon: k === "icon" || k === "both", wordmark: k === "wordmark" || k === "both" };
   const t = { ...d.t };
   const textAt = (y: number) => {
     t.header = { ...t.header, y }; t.sub = { ...t.sub, y: y + 9 };
-    // keep the can clear of the sub line
     const top = y + 12, scale = Math.min(t.product.scale, (100 - top - 3) / 68);
     t.product = { ...t.product, scale, y: top + (68 * scale) / 2 };
   };
-  if (k === "icon") { t.icon = { x: 50, y: 9, scale: 0.4 }; textAt(22); }
-  if (k === "wordmark") { t.wordmark = { x: 50, y: 8, scale: 0.6 }; textAt(19); }
-  if (k === "both") { t.icon = { x: 50, y: 7, scale: 0.28 }; t.wordmark = { x: 50, y: 15, scale: 0.5 }; textAt(26); }
+  if (k === "icon") { t.icon = { x: 50, y: 9, scale: LOGO_DEFAULT_SCALE.icon }; textAt(22); }
+  if (k === "wordmark") { t.wordmark = { x: 50, y: 8, scale: LOGO_DEFAULT_SCALE.wordmark }; textAt(19); }
+  // icon top, wordmark bottom, sized to the lockup rule
+  if (k === "both") { t.icon = { x: 50, y: 8, scale: LOGO_DEFAULT_SCALE.icon }; t.wordmark = { x: 50, y: 90, scale: LOGO_DEFAULT_SCALE.wordmark }; textAt(22); }
   if (k === "lockup") { t.lockup = { x: 50, y: d.lockup.layout === "above" ? 11 : 8, scale: d.lockup.layout === "above" ? 0.6 : 0.8 }; textAt(d.lockup.layout === "above" ? 27 : 20); }
   return { ...d, layers, t };
 }
@@ -125,7 +158,7 @@ const initialDoc: Doc = {
   t: {
     product: { x: 50, y: 62, scale: 1 },
     radial: { x: 76, y: 76, scale: 1 },
-    icon: { x: 50, y: 9, scale: 0.5 },
+    icon: { x: 50, y: 9, scale: 0.242 },
     lockup: { x: 50, y: 9, scale: 1 },
     tagline: { x: 50, y: 33, scale: 1 },
     wordmark: { x: 50, y: 8, scale: 0.6 },
@@ -727,7 +760,11 @@ export default function Home() {
   // actions
   const setT = (k: OverlayKey, v: Partial<T>, key = "t-" + k) => commit((d) => ({ ...d, t: { ...d.t, [k]: { ...d.t[k], ...v } } }), key);
   const setBg = (v: Partial<BgSettings>, key: string) => commit((d) => ({ ...d, bg: { ...d.bg, ...v }, bgPreset: null, bgSource: "create", layers: { ...d.layers, background: true } }), key);
-  function toggleLayer(k: keyof Doc["layers"]) { commit((d) => ({ ...d, layers: { ...d.layers, [k]: !d.layers[k], ...(k === "lockup" && !d.layers.lockup ? { icon: false, wordmark: false } : {}), ...((k === "icon" || k === "wordmark") && !d.layers[k] ? { lockup: false } : {}) } })); }
+  function toggleLayer(k: keyof Doc["layers"]) {
+    // logo layers (icon / wordmark / lockup / tagline) toggle independently so several can sit on the canvas together
+    if (k === "icon" || k === "wordmark" || k === "lockup" || k === "tagline") { commit((d) => toggleLogo(d, k)); return; }
+    commit((d) => ({ ...d, layers: { ...d.layers, [k]: !d.layers[k] } }));
+  }
   function pickProduct(k: ProductKey) {
     commit((d) => ({
       ...d, product: k, aligned: null,
@@ -1549,7 +1586,7 @@ export default function Home() {
                 <div className="card">
                   <div className="card-h"><b>Tagline: drink brighter</b></div>
                   <div className="row">
-                    <button className={`ghost small ${doc.lockup.tagline ? "on" : ""}`} onClick={() => commit((d) => ({ ...d, lockup: { ...d.lockup, tagline: !d.lockup.tagline }, layers: { ...d.layers, lockup: true, icon: false, wordmark: false } }))}>{doc.lockup.tagline ? "Remove from lockup" : "Add under lockup"}</button>
+                    <button className={`ghost small ${doc.lockup.tagline ? "on" : ""}`} onClick={() => commit((d) => ({ ...d, lockup: { ...d.lockup, tagline: !d.lockup.tagline }, layers: { ...d.layers, lockup: true } }))}>{doc.lockup.tagline ? "Remove from lockup" : "Add under lockup"}</button>
                     <button className={`ghost small ${doc.layers.tagline ? "on" : ""}`} onClick={() => toggleLayer("tagline")}>{doc.layers.tagline ? "Remove layer" : "Add as own layer"}</button>
                   </div>
                   <div className="seg small">
@@ -1568,29 +1605,28 @@ export default function Home() {
                   </div>
                 </Group>
                 <div className="card">
-                  <div className="card-h"><b>Logo style</b></div>
-                  <div className="seg small">
-                    {([["none", "None"], ["icon", "Icon"], ["wordmark", "Wordmark"], ["lockup", "Lockup"], ["both", "Icon + wordmark"]] as const).map(([k, l]) => {
-                      const L = doc.layers, cur = L.lockup ? "lockup" : L.icon && L.wordmark ? "both" : L.icon ? "icon" : L.wordmark ? "wordmark" : "none";
-                      return <button key={k} className={cur === k ? "on" : ""} onClick={() => commit((d) => applyLogoStyle(d, k))}>{l}</button>;
-                    })}
+                  <div className="card-h"><b>Logo elements</b></div>
+                  <div className="seg small wrap">
+                    {([["icon", "Icon"], ["wordmark", "Wordmark"], ["lockup", "Lockup"], ["tagline", "drink brighter"]] as const).map(([k, l]) => (
+                      <button key={k} className={doc.layers[k] ? "on" : ""} onClick={() => commit((d) => toggleLogo(d, k))} /* independent */>{l}</button>
+                    ))}
                   </div>
-                  <small className="muted">Lockup keeps the icon and wordmark together as one layer. Icon + wordmark gives two separate layers you can place apart.</small>
+                  <small className="muted">Add several at once. Each stays its own layer, so you can put the icon at the top and the wordmark at the bottom. New ones land in a free spot at lockup proportions (icon ~30% of wordmark width).</small>
                 </div>
                 {doc.layers.lockup && (
                   <div className="card">
                     <div className="card-h"><b>Lockup</b><Switch on onClick={() => toggleLayer("lockup")} /></div>
                     <div className="seg">
-                      {([["left", "Icon left"], ["above", "Icon above"]] as const).map(([k, l]) => <button key={k} className={doc.lockup.layout === k ? "on" : ""} onClick={() => commit((d) => applyLogoStyle({ ...d, lockup: { ...d.lockup, layout: k, spacing: k === "above" ? 20 : 22 } }, "lockup"))}>{l}</button>)}
+                      {([["left", "Icon left"], ["above", "Icon above"]] as const).map(([k, l]) => <button key={k} className={doc.lockup.layout === k ? "on" : ""} onClick={() => commit((d) => ({ ...d, lockup: { ...d.lockup, layout: k, spacing: k === "above" ? 20 : 22 } }))}>{l}</button>)}
                     </div>
                     <Range label="Spacing" unit="%" min={0} max={80} value={doc.lockup.spacing} onChange={(v) => commit((d) => ({ ...d, lockup: { ...d.lockup, spacing: v } }), "lsp")} />
                     <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t.lockup.scale * 100)} onChange={(v) => setT("lockup", { scale: v / 100 })} />
                   </div>
                 )}
-                {([["icon", "Icon"], ["wordmark", "Wordmark"]] as Array<["icon" | "wordmark" | "radial", string]>).filter(([k]) => k === "radial" || doc.layers[k]).map(([k, l]) => (
+                {([["icon", "Icon"], ["wordmark", "Wordmark"], ["tagline", "drink brighter"]] as Array<[LogoKey, string]>).filter(([k]) => !!doc.layers[k]).map(([k, l]) => (
                   <div key={k} className="card">
-                    <div className="card-h"><b>{l}</b><Switch on={doc.layers[k]} onClick={() => toggleLayer(k)} /></div>
-                    {doc.layers[k] && <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t[k].scale * 100)} onChange={(v) => setT(k, { scale: v / 100 })} />}
+                    <div className="card-h"><b>{l}</b><Switch on={!!doc.layers[k]} onClick={() => toggleLayer(k)} /></div>
+                    <Range label="Size" unit="%" min={20} max={300} value={Math.round(doc.t[k].scale * 100)} onChange={(v) => setT(k, { scale: v / 100 })} />
                   </div>
                 ))}
               </>
